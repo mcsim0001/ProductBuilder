@@ -1,0 +1,782 @@
+import Foundation
+#if canImport(AppKit)
+import AppKit
+#endif
+
+struct PackageBuildService {
+    struct BuildResult {
+        let outputURL: URL
+        let uninstallerURL: URL?
+    }
+
+    func build(project: PackageProject, log: @escaping @MainActor (String) -> Void) async throws -> BuildResult {
+        try await validate(project)
+
+        let fileManager = FileManager.default
+        let temporaryRoot = fileManager.temporaryDirectory
+            .appendingPathComponent("Productbuilder-\(UUID().uuidString)", isDirectory: true)
+        let componentDirectory = temporaryRoot.appendingPathComponent("Components", isDirectory: true)
+        let stageDirectory = temporaryRoot.appendingPathComponent("Stage", isDirectory: true)
+        try fileManager.createDirectory(at: componentDirectory, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: stageDirectory, withIntermediateDirectories: true)
+
+        defer {
+            try? fileManager.removeItem(at: temporaryRoot)
+        }
+
+        await log("Preparing build workspace: \(temporaryRoot.path)")
+
+        var builtComponents: [BuiltComponent] = []
+        for component in project.components {
+            let built = try await buildComponent(
+                component,
+                componentDirectory: componentDirectory,
+                stageDirectory: stageDirectory,
+                log: log
+            )
+            builtComponents.append(built)
+        }
+
+        let resourceManifest = try await makeResourcesDirectory(project: project, baseDirectory: temporaryRoot, log: log)
+        let distributionURL = temporaryRoot.appendingPathComponent("Distribution.xml")
+        try makeDistribution(project: project, components: builtComponents, resources: resourceManifest)
+            .write(to: distributionURL, atomically: true, encoding: .utf8)
+
+        let outputDirectory = URL(fileURLWithPath: project.outputDirectory, isDirectory: true)
+        try fileManager.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+        let outputURL = outputDirectory.appendingPathComponent(project.outputFileName)
+        if fileManager.fileExists(atPath: outputURL.path) {
+            try fileManager.removeItem(at: outputURL)
+        }
+
+        var arguments = [
+            "--distribution", distributionURL.path,
+            "--package-path", componentDirectory.path
+        ]
+
+        if let resourcesURL = resourceManifest.resourcesURL {
+            arguments += ["--resources", resourcesURL.path]
+        }
+
+        if !project.signingIdentity.trimmed.isEmpty {
+            arguments += ["--sign", project.signingIdentity.trimmed]
+        }
+
+        arguments.append(outputURL.path)
+        try await run("/usr/bin/productbuild", arguments: arguments, log: log)
+        await applyPackageIconIfNeeded(project: project, outputURL: outputURL, log: log)
+        await log("Created product package: \(outputURL.path)")
+
+        let uninstallerURL: URL?
+        if project.generateUninstaller {
+            uninstallerURL = try makeUninstaller(project: project, components: builtComponents, outputDirectory: outputDirectory)
+            await log("Created uninstaller script: \(uninstallerURL?.path ?? "")")
+        } else {
+            uninstallerURL = nil
+        }
+
+        return BuildResult(outputURL: outputURL, uninstallerURL: uninstallerURL)
+    }
+
+    private func validate(_ project: PackageProject) async throws {
+        guard !project.productName.trimmed.isEmpty else {
+            throw BuildError.validation("Product name is required.")
+        }
+        guard !project.productIdentifier.trimmed.isEmpty else {
+            throw BuildError.validation("Product identifier is required.")
+        }
+        guard !project.productVersion.trimmed.isEmpty else {
+            throw BuildError.validation("Product version is required.")
+        }
+        guard !project.outputDirectory.trimmed.isEmpty else {
+            throw BuildError.validation("Output directory is required.")
+        }
+        guard project.enableAnywhereDomain || project.enableCurrentUserHomeDomain || project.enableLocalSystemDomain else {
+            throw BuildError.validation("Enable at least one install domain.")
+        }
+        guard !project.components.isEmpty else {
+            throw BuildError.validation("Add at least one component.")
+        }
+
+        let resourcePaths = [
+            project.resourcesDirectory,
+            project.logoPath,
+            project.backgroundPath,
+            project.darkBackgroundPath,
+            project.welcomePath,
+            project.readmePath,
+            project.licensePath,
+            project.conclusionPath
+        ]
+        + project.welcomeLocalizations.map(\.path)
+        + project.readmeLocalizations.map(\.path)
+        + project.licenseLocalizations.map(\.path)
+        + project.conclusionLocalizations.map(\.path)
+
+        for localization in project.allInstallerResourceLocalizations where !localization.path.trimmed.isEmpty && localization.normalizedLanguageCode.isEmpty {
+            throw BuildError.validation("Localization language code is required for \(localization.path).")
+        }
+
+        for path in resourcePaths.filter({ !$0.trimmed.isEmpty }) where !FileManager.default.fileExists(atPath: path) {
+            throw BuildError.validation("Resource does not exist: \(path)")
+        }
+
+        let fileManager = FileManager.default
+        for component in project.components {
+            let payloadEntries = component.effectivePayloadEntries
+            guard !payloadEntries.isEmpty else {
+                throw BuildError.validation("Component '\(component.name)' needs at least one payload entry.")
+            }
+            for payload in payloadEntries {
+                guard payload.destinationPath.hasPrefix("/") else {
+                    throw BuildError.validation("Destination must be an absolute path for '\(component.name)'.")
+                }
+                if payload.kind != .emptyDirectory {
+                    guard !payload.sourcePath.trimmed.isEmpty else {
+                        throw BuildError.validation("Payload entry '\(payload.title)' needs a source path.")
+                    }
+                    guard fileManager.fileExists(atPath: payload.sourcePath) else {
+                        throw BuildError.validation("Source does not exist: \(payload.sourcePath)")
+                    }
+                }
+                if payload.kind == .folderContents {
+                    var isDirectory: ObjCBool = false
+                    guard fileManager.fileExists(atPath: payload.sourcePath, isDirectory: &isDirectory), isDirectory.boolValue else {
+                        throw BuildError.validation("Folder Contents source must be a directory: \(payload.sourcePath)")
+                    }
+                }
+            }
+            guard !component.packageIdentifier.trimmed.isEmpty else {
+                throw BuildError.validation("Component '\(component.name)' needs a package identifier.")
+            }
+            if component.isRequired && !component.isSelected {
+                throw BuildError.validation("Component '\(component.name)' is required and must be selected by default.")
+            }
+        }
+    }
+
+    private func buildComponent(
+        _ component: PackageComponent,
+        componentDirectory: URL,
+        stageDirectory: URL,
+        log: @escaping @MainActor (String) -> Void
+    ) async throws -> BuiltComponent {
+        let fileManager = FileManager.default
+        let componentStage = stageDirectory.appendingPathComponent(component.id.uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: componentStage, withIntermediateDirectories: true)
+
+        var installedPayloadPaths: [String] = []
+        for payload in component.effectivePayloadEntries {
+            let stagedPaths = try stage(payload, in: componentStage)
+            installedPayloadPaths.append(contentsOf: stagedPaths)
+            for stagedPath in stagedPaths {
+                await log("Staged \(payload.title) -> \(stagedPath)")
+            }
+        }
+
+        var arguments = [
+            "--root", componentStage.path,
+            "--identifier", component.packageIdentifier.trimmed,
+            "--version", component.version.trimmed,
+            "--install-location", "/",
+            "--ownership", component.ownership.rawValue
+        ]
+
+        if let scriptsDirectory = try makeScriptsDirectory(for: component, baseDirectory: componentStage) {
+            arguments += ["--scripts", scriptsDirectory.path]
+        }
+
+        let componentPackageURL = componentDirectory.appendingPathComponent(component.componentPackageName)
+        arguments.append(componentPackageURL.path)
+
+        try await run("/usr/bin/pkgbuild", arguments: arguments, log: log)
+        await log("Built component package: \(componentPackageURL.lastPathComponent)")
+
+        return BuiltComponent(component: component, packageURL: componentPackageURL, installedPayloadPaths: installedPayloadPaths)
+    }
+
+    private func stage(_ payload: PackagePayloadEntry, in componentStage: URL) throws -> [String] {
+        let fileManager = FileManager.default
+        let destinationRoot = componentStage.appendingPathComponent(payload.destinationPath.dropLeadingSlash, isDirectory: true)
+        try fileManager.createDirectory(at: destinationRoot, withIntermediateDirectories: true)
+
+        switch payload.kind {
+        case .emptyDirectory:
+            return []
+
+        case .fileOrFolder:
+            let sourceURL = URL(fileURLWithPath: payload.sourcePath)
+            let destinationURL = destinationRoot.appendingPathComponent(sourceURL.lastPathComponent)
+            try copyReplacingItem(from: sourceURL, to: destinationURL)
+            return [payload.destinationPath.appendingPathComponent(sourceURL.lastPathComponent)]
+
+        case .folderContents:
+            let sourceURL = URL(fileURLWithPath: payload.sourcePath, isDirectory: true)
+            let contents = try fileManager.contentsOfDirectory(at: sourceURL, includingPropertiesForKeys: nil)
+            for sourceChild in contents {
+                try copyReplacingItem(from: sourceChild, to: destinationRoot.appendingPathComponent(sourceChild.lastPathComponent))
+            }
+            if contents.isEmpty {
+                return [payload.destinationPath.normalizedAbsolutePath]
+            }
+            return contents.map { payload.destinationPath.appendingPathComponent($0.lastPathComponent) }
+        }
+    }
+
+    private func copyReplacingItem(from sourceURL: URL, to destinationURL: URL) throws {
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: destinationURL.path) {
+            try fileManager.removeItem(at: destinationURL)
+        }
+        try fileManager.copyItem(at: sourceURL, to: destinationURL)
+    }
+
+    private func makeScriptsDirectory(for component: PackageComponent, baseDirectory: URL) throws -> URL? {
+        let scripts = [
+            ("preinstall", component.preinstallScriptPath.trimmed),
+            ("postinstall", component.postinstallScriptPath.trimmed)
+        ].filter { !$0.1.isEmpty }
+
+        guard !scripts.isEmpty else { return nil }
+
+        let fileManager = FileManager.default
+        let scriptsDirectory = baseDirectory.appendingPathComponent("Scripts", isDirectory: true)
+        try fileManager.createDirectory(at: scriptsDirectory, withIntermediateDirectories: true)
+
+        for (scriptName, sourcePath) in scripts {
+            let sourceURL = URL(fileURLWithPath: sourcePath)
+            guard fileManager.fileExists(atPath: sourceURL.path) else {
+                throw BuildError.validation("Script does not exist: \(sourceURL.path)")
+            }
+            let destinationURL = scriptsDirectory.appendingPathComponent(scriptName)
+            if fileManager.fileExists(atPath: destinationURL.path) {
+                try fileManager.removeItem(at: destinationURL)
+            }
+            try fileManager.copyItem(at: sourceURL, to: destinationURL)
+            try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: destinationURL.path)
+        }
+
+        return scriptsDirectory
+    }
+
+    private func makeResourcesDirectory(
+        project: PackageProject,
+        baseDirectory: URL,
+        log: @escaping @MainActor (String) -> Void
+    ) async throws -> ResourceManifest {
+        let fileManager = FileManager.default
+        var manifest = ResourceManifest()
+        let hasExplicitScreens = ![
+            project.welcomePath,
+            project.readmePath,
+            project.licensePath,
+            project.conclusionPath
+        ].allSatisfy { $0.trimmed.isEmpty }
+            || !project.allInstallerResourceLocalizations.allSatisfy { $0.path.trimmed.isEmpty }
+        let hasExplicitVisuals = ![
+            project.logoPath,
+            project.backgroundPath,
+            project.darkBackgroundPath
+        ].allSatisfy { $0.trimmed.isEmpty }
+
+        guard !project.resourcesDirectory.trimmed.isEmpty || hasExplicitScreens || hasExplicitVisuals else {
+            return manifest
+        }
+
+        let resourcesURL = baseDirectory.appendingPathComponent("Resources", isDirectory: true)
+        try fileManager.createDirectory(at: resourcesURL, withIntermediateDirectories: true)
+        manifest.resourcesURL = resourcesURL
+
+        if !project.resourcesDirectory.trimmed.isEmpty {
+            let sourceDirectory = URL(fileURLWithPath: project.resourcesDirectory, isDirectory: true)
+            let contents = try fileManager.contentsOfDirectory(at: sourceDirectory, includingPropertiesForKeys: nil)
+            for sourceURL in contents {
+                let destinationURL = resourcesURL.appendingPathComponent(sourceURL.lastPathComponent)
+                if fileManager.fileExists(atPath: destinationURL.path) {
+                    try fileManager.removeItem(at: destinationURL)
+                }
+                try fileManager.copyItem(at: sourceURL, to: destinationURL)
+            }
+            await log("Copied resources from \(sourceDirectory.path)")
+        }
+
+        manifest.logoFile = try copyVisualResource(
+            project.logoPath,
+            prefix: "Logo",
+            to: resourcesURL
+        )
+        if let logoFile = manifest.logoFile {
+            await log("Added package icon resource: \(logoFile)")
+        }
+
+        manifest.backgroundFile = try copyVisualResource(
+            project.backgroundPath,
+            prefix: "background",
+            to: resourcesURL
+        )
+        if let backgroundFile = manifest.backgroundFile {
+            await log("Added light background: \(backgroundFile)")
+        }
+
+        let darkBackgroundPath = project.darkBackgroundPath.trimmed.isEmpty
+            ? project.backgroundPath
+            : project.darkBackgroundPath
+        manifest.darkBackgroundFile = try copyVisualResource(
+            darkBackgroundPath,
+            prefix: "background-darkAqua",
+            to: resourcesURL
+        )
+        if let darkBackgroundFile = manifest.darkBackgroundFile {
+            if project.darkBackgroundPath.trimmed.isEmpty {
+                await log("Added dark background fallback: \(darkBackgroundFile)")
+            } else {
+                await log("Added dark background: \(darkBackgroundFile)")
+            }
+        }
+
+        manifest.welcomeFile = try copyScreen(
+            project.welcomePath,
+            localizations: project.welcomeLocalizations,
+            prefix: "Welcome",
+            to: resourcesURL,
+            log: log
+        )
+        manifest.readmeFile = try copyScreen(
+            project.readmePath,
+            localizations: project.readmeLocalizations,
+            prefix: "ReadMe",
+            to: resourcesURL,
+            log: log
+        )
+        manifest.licenseFile = try copyScreen(
+            project.licensePath,
+            localizations: project.licenseLocalizations,
+            prefix: "License",
+            to: resourcesURL,
+            log: log
+        )
+        manifest.conclusionFile = try copyScreen(
+            project.conclusionPath,
+            localizations: project.conclusionLocalizations,
+            prefix: "Conclusion",
+            to: resourcesURL,
+            log: log
+        )
+
+        return manifest
+    }
+
+    private func copyScreen(
+        _ path: String,
+        localizations: [LocalizedInstallerResource],
+        prefix: String,
+        to resourcesURL: URL,
+        log: @escaping @MainActor (String) -> Void
+    ) throws -> String? {
+        let validLocalizations = localizations.filter { !$0.path.trimmed.isEmpty && !$0.normalizedLanguageCode.isEmpty }
+        guard !path.trimmed.isEmpty || !validLocalizations.isEmpty else { return nil }
+
+        let sourceForFileName = !path.trimmed.isEmpty ? path : validLocalizations[0].path
+        let fileName = screenFileName(from: sourceForFileName, prefix: prefix)
+        let fileManager = FileManager.default
+
+        if !path.trimmed.isEmpty {
+            try copyItem(from: URL(fileURLWithPath: path), to: resourcesURL.appendingPathComponent(fileName))
+        } else if let fallback = validLocalizations.first {
+            try copyItem(from: URL(fileURLWithPath: fallback.path), to: resourcesURL.appendingPathComponent(fileName))
+        }
+
+        for localization in validLocalizations {
+            let lprojDirectory = resourcesURL.appendingPathComponent("\(localization.normalizedLanguageCode).lproj", isDirectory: true)
+            try fileManager.createDirectory(at: lprojDirectory, withIntermediateDirectories: true)
+            try copyItem(from: URL(fileURLWithPath: localization.path), to: lprojDirectory.appendingPathComponent(fileName))
+        }
+
+        if !validLocalizations.isEmpty {
+            Task { @MainActor in
+                log("Added \(validLocalizations.count) localization(s) for \(fileName)")
+            }
+        }
+
+        return fileName
+    }
+
+    private func screenFileName(from path: String, prefix: String) -> String {
+        let sourceURL = URL(fileURLWithPath: path)
+        let fileExtension = sourceURL.pathExtension
+        return fileExtension.isEmpty ? prefix : "\(prefix).\(fileExtension)"
+    }
+
+    private func copyVisualResource(_ path: String, prefix: String, to resourcesURL: URL) throws -> String? {
+        guard !path.trimmed.isEmpty else { return nil }
+
+        let sourceURL = URL(fileURLWithPath: path)
+        let fileName = screenFileName(from: path, prefix: prefix)
+        try copyItem(from: sourceURL, to: resourcesURL.appendingPathComponent(fileName))
+        return fileName
+    }
+
+    private func copyItem(from sourceURL: URL, to destinationURL: URL) throws {
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: destinationURL.path) {
+            try fileManager.removeItem(at: destinationURL)
+        }
+        try fileManager.copyItem(at: sourceURL, to: destinationURL)
+    }
+
+    private func makeDistribution(
+        project: PackageProject,
+        components: [BuiltComponent],
+        resources: ResourceManifest
+    ) -> String {
+        let domains = #"<domains enable_anywhere="\#(project.enableAnywhereDomain.xmlBool)" enable_currentUserHome="\#(project.enableCurrentUserHomeDomain.xmlBool)" enable_localSystem="\#(project.enableLocalSystemDomain.xmlBool)"/>"#
+
+        let screenTags = [
+            resources.welcomeFile.map { installerResourceTag("welcome", file: $0) },
+            resources.readmeFile.map { installerResourceTag("readme", file: $0) },
+            resources.licenseFile.map { installerResourceTag("license", file: $0) },
+            resources.conclusionFile.map { installerResourceTag("conclusion", file: $0) }
+        ].compactMap { $0 }.joined(separator: "\n")
+        let backgroundTags = [
+            resources.backgroundFile.map {
+                backgroundResourceTag(
+                    "background",
+                    file: $0,
+                    scaling: project.backgroundScaling,
+                    alignment: project.backgroundAlignment
+                )
+            },
+            resources.darkBackgroundFile.map {
+                backgroundResourceTag(
+                    "background-darkAqua",
+                    file: $0,
+                    scaling: project.backgroundScaling,
+                    alignment: project.backgroundAlignment
+                )
+            }
+        ].compactMap { $0 }.joined(separator: "\n")
+
+        let minimumSystemCheck: String
+        if !project.minimumSystemVersion.trimmed.isEmpty {
+            minimumSystemCheck = """
+                <installation-check script="checkMinimumSystemVersion()"/>
+                <script>
+                <![CDATA[
+                function checkMinimumSystemVersion() {
+                    if (system.compareVersions(system.version.ProductVersion, '\(project.minimumSystemVersion.trimmed)') < 0) {
+                        my.result.title = 'Unsupported macOS Version';
+                        my.result.message = '\(project.productName) requires macOS \(project.minimumSystemVersion.trimmed) or later.';
+                        my.result.type = 'Fatal';
+                        return false;
+                    }
+                    return true;
+                }
+                ]]>
+                </script>
+            """
+        } else {
+            minimumSystemCheck = ""
+        }
+
+        let outlineLines = components
+            .map { #"        <line choice="\#($0.choiceID)"/>"# }
+            .joined(separator: "\n")
+
+        let choices = components
+            .map {
+                """
+                    <choice id="\($0.choiceID)" title="\($0.component.name.xmlEscaped)" selected="\($0.component.isSelected.xmlBool)" enabled="\((!$0.component.isRequired).xmlBool)" visible="\($0.component.isVisible.xmlBool)">
+                        <pkg-ref id="\($0.component.packageIdentifier.xmlEscaped)"/>
+                    </choice>
+                """
+            }
+            .joined(separator: "\n")
+
+        let packageRefs = components
+            .map {
+                """
+                    <pkg-ref id="\($0.component.packageIdentifier.xmlEscaped)" version="\($0.component.version.xmlEscaped)" onConclusion="none">\($0.packageURL.lastPathComponent.xmlEscaped)</pkg-ref>
+                """
+            }
+            .joined(separator: "\n")
+
+        return """
+        <?xml version="1.0" encoding="utf-8"?>
+        <installer-gui-script minSpecVersion="1">
+            <title>\(project.productName.xmlEscaped)</title>
+            <options customize="\(project.allowCustomize ? "allow" : "never")" require-scripts="false"/>
+            \(domains)
+        \(backgroundTags)
+        \(screenTags)
+        \(minimumSystemCheck)
+            <choices-outline>
+                <line choice="default">
+        \(outlineLines)
+                </line>
+            </choices-outline>
+            <choice id="default" title="\(project.productName.xmlEscaped)"/>
+        \(choices)
+        \(packageRefs)
+        </installer-gui-script>
+        """
+    }
+
+    private func installerResourceTag(_ name: String, file: String) -> String {
+        "    <\(name) file=\"\(file.xmlEscaped)\"\(resourceTypeAttributeSuffix(for: file))/>\n"
+            .trimmingCharacters(in: .newlines)
+    }
+
+    private func backgroundResourceTag(
+        _ name: String,
+        file: String,
+        scaling: InstallerBackgroundScaling,
+        alignment: InstallerBackgroundAlignment
+    ) -> String {
+        "    <\(name) file=\"\(file.xmlEscaped)\"\(resourceTypeAttributeSuffix(for: file)) scaling=\"\(scaling.rawValue.xmlEscaped)\" alignment=\"\(alignment.rawValue.xmlEscaped)\"/>"
+    }
+
+    private func resourceTypeAttributeSuffix(for file: String) -> String {
+        let fileExtension = URL(fileURLWithPath: file).pathExtension.lowercased()
+        switch fileExtension {
+        case "html", "htm":
+            return #" mime-type="text/html""#
+        case "rtf":
+            return #" mime-type="text/rtf""#
+        case "rtfd":
+            return #" uti="com.apple.rtfd""#
+        case "txt", "text":
+            return #" mime-type="text/plain""#
+        case "png":
+            return #" mime-type="image/png""#
+        case "jpg", "jpeg":
+            return #" mime-type="image/jpeg""#
+        case "gif":
+            return #" mime-type="image/gif""#
+        case "tif", "tiff":
+            return #" mime-type="image/tiff""#
+        case "icns":
+            return #" uti="com.apple.icns""#
+        default:
+            return ""
+        }
+    }
+
+    private func applyPackageIconIfNeeded(
+        project: PackageProject,
+        outputURL: URL,
+        log: @escaping @MainActor (String) -> Void
+    ) async {
+        guard !project.logoPath.trimmed.isEmpty else { return }
+
+        #if canImport(AppKit)
+        let logoPath = project.logoPath
+        let applied = await MainActor.run { () -> Bool in
+            guard let image = NSImage(contentsOfFile: logoPath) else { return false }
+            return NSWorkspace.shared.setIcon(image, forFile: outputURL.path, options: [])
+        }
+
+        if applied {
+            await log("Applied package icon from \(logoPath)")
+        } else {
+            await log("Warning: could not apply package icon from \(logoPath)")
+        }
+        #else
+        await log("Warning: package icon is not supported in this build environment.")
+        #endif
+    }
+
+    private func makeUninstaller(
+        project: PackageProject,
+        components: [BuiltComponent],
+        outputDirectory: URL
+    ) throws -> URL {
+        let outputURL = outputDirectory.appendingPathComponent(project.uninstallerFileName)
+        let removeLines = components
+            .flatMap(\.installedPayloadPaths)
+            .map { #"remove_path "\#($0.shellEscapedForScript)""# }
+            .joined(separator: "\n")
+        let forgetLines = components
+            .map { #"forget_receipt "\#($0.component.packageIdentifier.shellEscapedForScript)""# }
+            .joined(separator: "\n")
+
+        let script = """
+        #!/bin/zsh
+        set -euo pipefail
+
+        if [[ ${EUID} -ne 0 ]]; then
+          echo "Run this script with sudo."
+          exit 1
+        fi
+
+        remove_path() {
+          local target="$1"
+          if [[ -e "$target" || -L "$target" ]]; then
+            rm -rf "$target"
+            echo "Removed $target"
+          fi
+        }
+
+        forget_receipt() {
+          local identifier="$1"
+          if /usr/sbin/pkgutil --pkg-info "$identifier" >/dev/null 2>&1; then
+            /usr/sbin/pkgutil --forget "$identifier" >/dev/null || true
+            echo "Forgot $identifier"
+          fi
+        }
+
+        \(removeLines)
+
+        \(forgetLines)
+
+        echo "Uninstall complete."
+        """
+
+        try script.write(to: outputURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: outputURL.path)
+        return outputURL
+    }
+
+    private func run(
+        _ launchPath: String,
+        arguments: [String],
+        log: @escaping @MainActor (String) -> Void
+    ) async throws {
+        await log("$ \(launchPath) \(arguments.map { $0.shellQuoted }.joined(separator: " "))")
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: launchPath)
+        process.arguments = arguments
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        try process.run()
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+
+        if let output = String(data: data, encoding: .utf8), !output.trimmed.isEmpty {
+            await log(output.trimmed)
+        }
+
+        guard process.terminationStatus == 0 else {
+            throw BuildError.commandFailed(launchPath, process.terminationStatus)
+        }
+    }
+}
+
+private struct BuiltComponent {
+    let component: PackageComponent
+    let packageURL: URL
+    let installedPayloadPaths: [String]
+
+    var choiceID: String {
+        "choice-\(component.id.uuidString)"
+    }
+}
+
+private struct ResourceManifest {
+    var resourcesURL: URL?
+    var logoFile: String?
+    var backgroundFile: String?
+    var darkBackgroundFile: String?
+    var welcomeFile: String?
+    var readmeFile: String?
+    var licenseFile: String?
+    var conclusionFile: String?
+}
+
+enum BuildError: LocalizedError {
+    case validation(String)
+    case commandFailed(String, Int32)
+
+    var errorDescription: String? {
+        switch self {
+        case .validation(let message):
+            return message
+        case .commandFailed(let command, let status):
+            return "\(command) failed with exit code \(status)."
+        }
+    }
+}
+
+private extension String {
+    var trimmed: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var xmlEscaped: String {
+        replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&apos;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+    }
+
+    var dropLeadingSlash: String {
+        var result = self
+        while result.hasPrefix("/") {
+            result.removeFirst()
+        }
+        return result
+    }
+
+    var normalizedAbsolutePath: String {
+        let pieces = split(separator: "/").map(String.init)
+        return pieces.isEmpty ? "/" : "/\(pieces.joined(separator: "/"))"
+    }
+
+    func appendingPathComponent(_ component: String) -> String {
+        let base = normalizedAbsolutePath
+        return base == "/" ? "/\(component)" : "\(base)/\(component)"
+    }
+
+    var shellQuoted: String {
+        if rangeOfCharacter(from: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "\"'"))) == nil {
+            return self
+        }
+        return "'\(replacingOccurrences(of: "'", with: "'\\''"))'"
+    }
+
+    var shellEscapedForScript: String {
+        replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "$", with: "\\$")
+            .replacingOccurrences(of: "`", with: "\\`")
+    }
+}
+
+private extension Bool {
+    var xmlBool: String {
+        self ? "true" : "false"
+    }
+}
+
+private extension PackageComponent {
+    var effectivePayloadEntries: [PackagePayloadEntry] {
+        if !payloadEntries.isEmpty {
+            return payloadEntries
+        }
+        if sourcePath.trimmed.isEmpty {
+            return []
+        }
+        return [PackagePayloadEntry(kind: .fileOrFolder, sourcePath: sourcePath, destinationPath: destinationPath)]
+    }
+}
+
+private extension PackageProject {
+    var allInstallerResourceLocalizations: [LocalizedInstallerResource] {
+        welcomeLocalizations + readmeLocalizations + licenseLocalizations + conclusionLocalizations
+    }
+}
+
+private extension LocalizedInstallerResource {
+    var normalizedLanguageCode: String {
+        var code = languageCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        if code.hasSuffix(".lproj") {
+            code.removeLast(".lproj".count)
+        }
+        return code
+    }
+}
