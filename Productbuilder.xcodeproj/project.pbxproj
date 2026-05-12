@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		9C96E3142C05D30000420001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9C96E3152C05D30000420001 /* Assets.xcassets */; };
+		9C96E3402C07000000420001 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 9C96E3412C07000000420001 /* Localizable.strings */; };
 		9C96E3012C05A10000420001 /* ProductbuilderApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C96E3002C05A10000420001 /* ProductbuilderApp.swift */; };
 		9C96E3032C05A10000420001 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C96E3022C05A10000420001 /* ContentView.swift */; };
 		9C96E3052C05A10000420001 /* PackageProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C96E3042C05A10000420001 /* PackageProject.swift */; };
@@ -17,6 +18,16 @@
 		9C96E3212C06000000420001 /* PackageProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C96E3042C05A10000420001 /* PackageProject.swift */; };
 		9C96E3222C06000000420001 /* PackageBuildService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C96E3062C05A10000420001 /* PackageBuildService.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		9C96E3602C08000000420001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9C96E2F02C05A10000420001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9C96E3282C06000000420001;
+			remoteInfo = productbuilder;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		9C96E2F82C05A10000420001 /* Productbuilder.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Productbuilder.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -28,6 +39,8 @@
 		9C96E3152C05D30000420001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9C96E3232C06000000420001 /* productbuilder */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = productbuilder; sourceTree = BUILT_PRODUCTS_DIR; };
 		9C96E3242C06000000420001 /* ProductbuilderCLI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductbuilderCLI.swift; sourceTree = "<group>"; };
+		9C96E3422C07000000420001 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		9C96E3432C07000000420001 /* uk */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = uk; path = uk.lproj/Localizable.strings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -74,6 +87,7 @@
 				9C96E3042C05A10000420001 /* PackageProject.swift */,
 				9C96E3062C05A10000420001 /* PackageBuildService.swift */,
 				9C96E3082C05A10000420001 /* ProjectDocument.swift */,
+				9C96E3412C07000000420001 /* Localizable.strings */,
 				9C96E3152C05D30000420001 /* Assets.xcassets */,
 			);
 				path = Productbuilder;
@@ -97,10 +111,12 @@
 				9C96E2F42C05A10000420001 /* Sources */,
 				9C96E2F52C05A10000420001 /* Frameworks */,
 				9C96E2F62C05A10000420001 /* Resources */,
+				9C96E3622C08000000420001 /* Copy Command Line Tool */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				9C96E3612C08000000420001 /* PBXTargetDependency */,
 			);
 			name = Productbuilder;
 			productName = Productbuilder;
@@ -147,6 +163,7 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				uk,
 				Base,
 			);
 			mainGroup = 9C96E2EF2C05A10000420001;
@@ -165,11 +182,48 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9C96E3402C07000000420001 /* Localizable.strings in Resources */,
 				9C96E3142C05D30000420001 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		9C96E3622C08000000420001 /* Copy Command Line Tool */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/productbuilder",
+			);
+			name = "Copy Command Line Tool";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/productbuilder",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nCLI_SOURCE=\"${BUILT_PRODUCTS_DIR}/productbuilder\"\nHELPERS_DIR=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers\"\nmkdir -p \"${HELPERS_DIR}\"\ncp -f \"${CLI_SOURCE}\" \"${HELPERS_DIR}/productbuilder\"\nchmod 755 \"${HELPERS_DIR}/productbuilder\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		9C96E3412C07000000420001 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				9C96E3422C07000000420001 /* en */,
+				9C96E3432C07000000420001 /* uk */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin PBXSourcesBuildPhase section */
 		9C96E2F42C05A10000420001 /* Sources */ = {
@@ -195,6 +249,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		9C96E3612C08000000420001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9C96E3282C06000000420001 /* productbuilder */;
+			targetProxy = 9C96E3602C08000000420001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		9C96E30A2C05A10000420001 /* Debug */ = {
@@ -233,7 +295,7 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -294,7 +356,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -323,6 +385,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Productbuilder;
+				INFOPLIST_KEY_CFBundleIconFile = AppIcon;
+				INFOPLIST_KEY_CFBundleIconName = AppIcon;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 mcsim";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -349,6 +413,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Productbuilder;
+				INFOPLIST_KEY_CFBundleIconFile = AppIcon;
+				INFOPLIST_KEY_CFBundleIconName = AppIcon;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 mcsim";
 				LD_RUNPATH_SEARCH_PATHS = (
