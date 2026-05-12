@@ -525,7 +525,7 @@ enum PackagesProjectImporter {
         }
 
         let directoryDestination = normalizedDestination(nextDestinationParts)
-        if directoryDestination != "/" {
+        if children.isEmpty, directoryDestination != "/", !isStandardSystemDirectoryTemplate(directoryDestination) {
             items.append(PackagePayloadEntry(
                 kind: .emptyDirectory,
                 sourcePath: "",
@@ -577,6 +577,52 @@ enum PackagesProjectImporter {
             .joined(separator: "/")
         return joined.isEmpty ? "/" : "/\(joined)"
     }
+
+    private static func isStandardSystemDirectoryTemplate(_ path: String) -> Bool {
+        standardSystemDirectoryTemplates.contains(normalizedAbsolutePath(path))
+    }
+
+    private static func normalizedAbsolutePath(_ path: String) -> String {
+        let pieces = path.split(separator: "/").map(String.init)
+        return pieces.isEmpty ? "/" : "/\(pieces.joined(separator: "/"))"
+    }
+
+    private static let standardSystemDirectoryTemplates: Set<String> = [
+        "/Applications",
+        "/Library",
+        "/Library/Application Support",
+        "/Library/Audio",
+        "/Library/Automator",
+        "/Library/ColorPickers",
+        "/Library/ColorSync",
+        "/Library/Components",
+        "/Library/Contextual Menu Items",
+        "/Library/Dictionaries",
+        "/Library/Documentation",
+        "/Library/Extensions",
+        "/Library/Filesystems",
+        "/Library/Fonts",
+        "/Library/Frameworks",
+        "/Library/Image Capture",
+        "/Library/Input Methods",
+        "/Library/Internet Plug-Ins",
+        "/Library/LaunchAgents",
+        "/Library/LaunchDaemons",
+        "/Library/Modem Scripts",
+        "/Library/PDF Services",
+        "/Library/PreferencePanes",
+        "/Library/Preference Panes",
+        "/Library/Printers",
+        "/Library/PrivilegedHelperTools",
+        "/Library/QuickLook",
+        "/Library/Receipts",
+        "/Library/Screen Savers",
+        "/Library/ScriptingAdditions",
+        "/Library/Scripts",
+        "/Library/Speech",
+        "/Library/StartupItems",
+        "/Library/WebServer"
+    ]
 
     private static func resolvePath(_ dictionary: [String: Any]?, baseURL: URL) -> String? {
         guard let dictionary,
