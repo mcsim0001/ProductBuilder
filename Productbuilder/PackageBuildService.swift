@@ -10,15 +10,19 @@ struct PackageBuildService {
     }
 
     func build(project: PackageProject, log: @escaping @MainActor (String) -> Void) async throws -> BuildResult {
-        try await validate(project)
+        try await runStage("Check project settings and resources", log: log) {
+            try await validate(project)
+        }
 
         let fileManager = FileManager.default
         let temporaryRoot = fileManager.temporaryDirectory
             .appendingPathComponent("Productbuilder-\(UUID().uuidString)", isDirectory: true)
         let componentDirectory = temporaryRoot.appendingPathComponent("Components", isDirectory: true)
         let stageDirectory = temporaryRoot.appendingPathComponent("Stage", isDirectory: true)
-        try fileManager.createDirectory(at: componentDirectory, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: stageDirectory, withIntermediateDirectories: true)
+        try await runStage("Prepare build workspace", log: log) {
+            try fileManager.createDirectory(at: componentDirectory, withIntermediateDirectories: true)
+            try fileManager.createDirectory(at: stageDirectory, withIntermediateDirectories: true)
+        }
 
         defer {
             try? fileManager.removeItem(at: temporaryRoot)
@@ -26,21 +30,36 @@ struct PackageBuildService {
 
         await log("Preparing build workspace: \(temporaryRoot.path)")
 
-        var builtComponents: [BuiltComponent] = []
-        for component in project.components {
-            let built = try await buildComponent(
-                component,
-                componentDirectory: componentDirectory,
-                stageDirectory: stageDirectory,
-                log: log
-            )
-            builtComponents.append(built)
+        let builtComponents = try await runStage("Create component packages (\(project.components.count))", log: log) {
+            var builtComponents: [BuiltComponent] = []
+            for component in project.components {
+                await log("Building component: \(component.name)")
+                let built = try await buildComponent(
+                    component,
+                    componentDirectory: componentDirectory,
+                    stageDirectory: stageDirectory,
+                    log: log
+                )
+                builtComponents.append(built)
+            }
+            return builtComponents
         }
 
-        let resourceManifest = try await makeResourcesDirectory(project: project, baseDirectory: temporaryRoot, log: log)
+        let resourceManifest: ResourceManifest
+        if hasInstallerResources(project) {
+            resourceManifest = try await runStage("Prepare installer resources", log: log) {
+                try await makeResourcesDirectory(project: project, baseDirectory: temporaryRoot, log: log)
+            }
+        } else {
+            await logSkip("Prepare installer resources: none configured", log: log)
+            resourceManifest = ResourceManifest()
+        }
+
         let distributionURL = temporaryRoot.appendingPathComponent("Distribution.xml")
-        try makeDistribution(project: project, components: builtComponents, resources: resourceManifest)
-            .write(to: distributionURL, atomically: true, encoding: .utf8)
+        try await runStage("Create Distribution XML", log: log) {
+            try makeDistribution(project: project, components: builtComponents, resources: resourceManifest)
+                .write(to: distributionURL, atomically: true, encoding: .utf8)
+        }
 
         let outputDirectory = URL(fileURLWithPath: project.outputDirectory, isDirectory: true)
         try fileManager.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
@@ -63,30 +82,90 @@ struct PackageBuildService {
         }
 
         arguments.append(outputURL.path)
-        try await run("/usr/bin/productbuild", arguments: arguments, log: log)
-        await applyPackageIconIfNeeded(project: project, outputURL: outputURL, log: log)
-        await log("Created product package: \(outputURL.path)")
+        let productStage = project.signingIdentity.trimmed.isEmpty
+            ? "Create product package"
+            : "Create and sign product package"
+        try await runStage(productStage, log: log) {
+            try await run("/usr/bin/productbuild", arguments: arguments, log: log)
+            await applyPackageIconIfNeeded(project: project, outputURL: outputURL, log: log)
+        }
+        if project.signingIdentity.trimmed.isEmpty {
+            await logSkip("Sign product package: no signing identity selected", log: log)
+        }
+        await log("Product package: \(outputURL.path)")
 
         let uninstallerURL: URL?
         if project.generateUninstaller {
-            uninstallerURL = try makeUninstaller(project: project, components: builtComponents, outputDirectory: outputDirectory)
-            await log("Created uninstaller script: \(uninstallerURL?.path ?? "")")
+            uninstallerURL = try await runStage("Create uninstaller script", log: log) {
+                try makeUninstaller(project: project, components: builtComponents, outputDirectory: outputDirectory)
+            }
+            await log("Uninstaller script: \(uninstallerURL?.path ?? "")")
         } else {
+            await logSkip("Create uninstaller script: disabled", log: log)
             uninstallerURL = nil
         }
 
         return BuildResult(outputURL: outputURL, uninstallerURL: uninstallerURL)
     }
 
+    private func runStage<T>(
+        _ title: String,
+        log: @escaping @MainActor (String) -> Void,
+        operation: () async throws -> T
+    ) async throws -> T {
+        await logStage(title, log: log)
+        do {
+            let value = try await operation()
+            await logOK(title, log: log)
+            return value
+        } catch {
+            await logError("\(title): \(error.localizedDescription)", log: log)
+            throw error
+        }
+    }
+
+    private func logStage(_ message: String, log: @escaping @MainActor (String) -> Void) async {
+        await log("[stage] \(message)")
+    }
+
+    private func logOK(_ message: String, log: @escaping @MainActor (String) -> Void) async {
+        await log("[ok] \(message)")
+    }
+
+    private func logSkip(_ message: String, log: @escaping @MainActor (String) -> Void) async {
+        await log("[skip] \(message)")
+    }
+
+    private func logError(_ message: String, log: @escaping @MainActor (String) -> Void) async {
+        await log("[error] \(message)")
+    }
+
+    private func hasInstallerResources(_ project: PackageProject) -> Bool {
+        ![
+            project.resourcesDirectory,
+            project.logoPath,
+            project.backgroundPath,
+            project.darkBackgroundPath,
+            project.welcomePath,
+            project.readmePath,
+            project.licensePath,
+            project.conclusionPath
+        ].allSatisfy { $0.trimmed.isEmpty }
+            || !project.allInstallerResourceLocalizations.allSatisfy { $0.path.trimmed.isEmpty }
+    }
+
     private func validate(_ project: PackageProject) async throws {
-        guard !project.productName.trimmed.isEmpty else {
-            throw BuildError.validation("Product name is required.")
+        if let issue = ProjectInputValidator.validateProductName(project.productName) {
+            throw BuildError.validation(issue.englishDescription(fieldName: "Product name"))
         }
         guard !project.productIdentifier.trimmed.isEmpty else {
             throw BuildError.validation("Product identifier is required.")
         }
         guard !project.productVersion.trimmed.isEmpty else {
             throw BuildError.validation("Product version is required.")
+        }
+        if let issue = ProjectInputValidator.validateProductFileName(ProjectInputValidator.productFileNameCandidate(for: project)) {
+            throw BuildError.validation(issue.englishDescription(fieldName: "Product file name"))
         }
         guard !project.outputDirectory.trimmed.isEmpty else {
             throw BuildError.validation("Output directory is required.")

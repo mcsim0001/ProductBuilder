@@ -4,6 +4,7 @@ struct PackageProject: Codable, Equatable {
     var productName: String = "My Product"
     var productIdentifier: String = "com.example.myproduct"
     var productVersion: String = "1.0.0"
+    var productFileName: String = ""
     var outputDirectory: String = "\(NSHomeDirectory())/Desktop"
     var resourcesDirectory: String = ""
     var logoPath: String = ""
@@ -29,11 +30,19 @@ struct PackageProject: Codable, Equatable {
     var components: [PackageComponent] = [PackageComponent()]
 
     var outputFileName: String {
+        let customName = productFileName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return Self.packageFileName(from: customName.isEmpty ? defaultOutputFileName : customName)
+    }
+
+    var defaultOutputFileName: String {
         let cleanedName = productName
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "/", with: "-")
         let name = cleanedName.isEmpty ? "Product" : cleanedName
-        return "\(name)-\(productVersion).pkg"
+        let version = productVersion
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "/", with: "-")
+        return version.isEmpty ? "\(name).pkg" : "\(name)-\(version).pkg"
     }
 
     var uninstallerFileName: String {
@@ -42,6 +51,84 @@ struct PackageProject: Codable, Equatable {
             .replacingOccurrences(of: "/", with: "-")
         let name = cleanedName.isEmpty ? "Product" : cleanedName
         return "Uninstall-\(name).sh"
+    }
+
+    private static func packageFileName(from rawName: String) -> String {
+        let cleanedName = rawName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "/", with: "-")
+        let name = cleanedName.isEmpty ? "Product.pkg" : cleanedName
+        return name.lowercased().hasSuffix(".pkg") ? name : "\(name).pkg"
+    }
+}
+
+enum ProjectInputValidationIssue: Equatable {
+    case required
+    case reservedDotName
+    case startsWithDot
+    case containsSlash
+    case containsColon
+    case containsControlCharacter
+    case tooLong(maxBytes: Int)
+
+    func englishDescription(fieldName: String) -> String {
+        switch self {
+        case .required:
+            return "\(fieldName) is required."
+        case .reservedDotName:
+            return "\(fieldName) cannot be \".\" or \"..\"."
+        case .startsWithDot:
+            return "\(fieldName) cannot start with a dot because macOS treats it as a hidden file."
+        case .containsSlash:
+            return "\(fieldName) cannot contain \"/\"."
+        case .containsColon:
+            return "\(fieldName) cannot contain \":\"."
+        case .containsControlCharacter:
+            return "\(fieldName) cannot contain control characters."
+        case .tooLong(let maxBytes):
+            return "\(fieldName) is too long. macOS file names are limited to \(maxBytes) bytes in UTF-8."
+        }
+    }
+}
+
+enum ProjectInputValidator {
+    static let maxMacOSFileNameBytes = 255
+
+    static func validateProductName(_ value: String) -> ProjectInputValidationIssue? {
+        validateMacOSFileNameComponent(value)
+    }
+
+    static func validateProductFileName(_ value: String) -> ProjectInputValidationIssue? {
+        validateMacOSFileNameComponent(value)
+    }
+
+    static func productFileNameCandidate(for project: PackageProject) -> String {
+        let customName = project.productFileName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return customName.isEmpty ? project.defaultOutputFileName : packageFileNameCandidate(from: customName)
+    }
+
+    private static func validateMacOSFileNameComponent(_ value: String) -> ProjectInputValidationIssue? {
+        let name = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return .required }
+        guard name != "." && name != ".." else { return .reservedDotName }
+        guard !name.hasPrefix(".") else { return .startsWithDot }
+        guard !name.contains("/") else { return .containsSlash }
+        guard !name.contains(":") else { return .containsColon }
+
+        if name.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) {
+            return .containsControlCharacter
+        }
+
+        guard name.utf8.count <= maxMacOSFileNameBytes else {
+            return .tooLong(maxBytes: maxMacOSFileNameBytes)
+        }
+
+        return nil
+    }
+
+    private static func packageFileNameCandidate(from rawName: String) -> String {
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.lowercased().hasSuffix(".pkg") ? name : "\(name).pkg"
     }
 }
 
@@ -116,6 +203,7 @@ extension PackageProject {
         case productName
         case productIdentifier
         case productVersion
+        case productFileName
         case outputDirectory
         case resourcesDirectory
         case logoPath
@@ -151,6 +239,7 @@ extension PackageProject {
         productName = try container.decodeIfPresent(String.self, forKey: .productName) ?? productName
         productIdentifier = try container.decodeIfPresent(String.self, forKey: .productIdentifier) ?? productIdentifier
         productVersion = try container.decodeIfPresent(String.self, forKey: .productVersion) ?? productVersion
+        productFileName = try container.decodeIfPresent(String.self, forKey: .productFileName) ?? productFileName
         outputDirectory = try container.decodeIfPresent(String.self, forKey: .outputDirectory) ?? outputDirectory
         resourcesDirectory = try container.decodeIfPresent(String.self, forKey: .resourcesDirectory) ?? resourcesDirectory
         logoPath = try container.decodeIfPresent(String.self, forKey: .logoPath) ?? logoPath

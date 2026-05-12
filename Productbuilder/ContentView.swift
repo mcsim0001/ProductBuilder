@@ -239,7 +239,10 @@ struct ContentView: View {
             Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 12) {
                 GridRow {
                     Text(localization.t("field.name"))
-                    TextField(localization.t("placeholder.productName"), text: $model.project.productName)
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField(localization.t("placeholder.productName"), text: $model.project.productName)
+                        validationMessage(for: ProjectInputValidator.validateProductName(model.project.productName), fieldName: localization.t("field.name"))
+                    }
                 }
 
                 GridRow {
@@ -251,6 +254,17 @@ struct ContentView: View {
                     Text(localization.t("field.version"))
                     TextField("1.0.0", text: $model.project.productVersion)
                         .frame(maxWidth: 160)
+                }
+
+                GridRow {
+                    Text(localization.t("field.productFileName"))
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField(localization.t("placeholder.productFileName"), text: productFileNameBinding)
+                        validationMessage(
+                            for: ProjectInputValidator.validateProductFileName(ProjectInputValidator.productFileNameCandidate(for: model.project)),
+                            fieldName: localization.t("field.productFileName")
+                        )
+                    }
                 }
 
                 GridRow {
@@ -277,11 +291,35 @@ struct ContentView: View {
                     localization.t("help.product.name"),
                     localization.t("help.product.identifier"),
                     localization.t("help.product.version"),
+                    localization.t("help.product.fileName"),
                     localization.t("help.product.output"),
                     localization.t("help.product.resources"),
                     localization.t("help.product.signing")
                 ]
             )
+        }
+    }
+
+    private var productFileNameBinding: Binding<String> {
+        Binding(
+            get: {
+                model.project.productFileName.trimmed.isEmpty
+                    ? model.project.defaultOutputFileName
+                    : model.project.productFileName
+            },
+            set: { newValue in
+                model.project.productFileName = newValue
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func validationMessage(for issue: ProjectInputValidationIssue?, fieldName: String) -> some View {
+        if let issue {
+            Text(issue.localizedDescription(fieldName: fieldName, localization: localization))
+                .font(.caption)
+                .foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -580,12 +618,20 @@ struct ContentView: View {
 
             ScrollViewReader { proxy in
                 ScrollView {
-                    Text(model.log.isEmpty ? localization.t("buildLog.empty") : model.log)
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(model.log.isEmpty ? .secondary : .primary)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
+                    VStack(alignment: .leading, spacing: 4) {
+                        if model.log.isEmpty {
+                            Text(localization.t("buildLog.empty"))
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(Array(model.log.components(separatedBy: .newlines).enumerated()), id: \.offset) { _, line in
+                                BuildLogLineView(line: line)
+                            }
+                        }
+                    }
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
 
                     Color.clear
                         .frame(height: 1)
@@ -656,10 +702,64 @@ struct ContentView: View {
                 if let uninstallerURL = result.uninstallerURL {
                     model.appendLog(localization.t("buildLog.uninstaller", uninstallerURL.path))
                 }
+                model.isBuilding = false
+                showBuildCompletionAlert(succeeded: true, project: project, result: result, error: nil)
             } catch {
                 model.appendLog(localization.t("buildLog.failed", error.localizedDescription))
+                model.isBuilding = false
+                showBuildCompletionAlert(succeeded: false, project: project, result: nil, error: error)
             }
-            model.isBuilding = false
+        }
+    }
+
+    private func showBuildCompletionAlert(
+        succeeded: Bool,
+        project: PackageProject,
+        result: PackageBuildService.BuildResult?,
+        error: Error?
+    ) {
+        let alert = NSAlert()
+        alert.alertStyle = succeeded ? .informational : .critical
+        alert.icon = ApplicationIcon.image()
+        alert.messageText = localization.t(succeeded ? "buildAlert.success.title" : "buildAlert.failure.title")
+
+        var lines: [String] = [localization.t("buildAlert.statusHeader")]
+        let stageLines = buildStageSummaryLines(from: model.log)
+        lines.append(contentsOf: stageLines.isEmpty ? [localization.t("buildAlert.noStageDetails")] : stageLines)
+
+        if let result {
+            lines.append("")
+            lines.append(localization.t("buildAlert.output", result.outputURL.path))
+            if let uninstallerURL = result.uninstallerURL {
+                lines.append(localization.t("buildAlert.uninstaller", uninstallerURL.path))
+            } else if project.generateUninstaller {
+                lines.append(localization.t("buildAlert.uninstallerSkipped"))
+            }
+        }
+
+        if let error {
+            lines.append("")
+            lines.append(localization.t("buildAlert.error", error.localizedDescription))
+        }
+
+        alert.informativeText = lines.joined(separator: "\n")
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+
+    private func buildStageSummaryLines(from log: String) -> [String] {
+        log.components(separatedBy: .newlines).compactMap { line in
+            let trimmedLine = line.trimmed
+            if trimmedLine.hasPrefix("[ok] ") {
+                return "\(localization.t("buildStatus.success")): \(trimmedLine.droppingBuildLogPrefix("[ok] "))"
+            }
+            if trimmedLine.hasPrefix("[error] ") {
+                return "\(localization.t("buildStatus.error")): \(trimmedLine.droppingBuildLogPrefix("[error] "))"
+            }
+            if trimmedLine.hasPrefix("[skip] ") {
+                return "\(localization.t("buildStatus.skipped")): \(trimmedLine.droppingBuildLogPrefix("[skip] "))"
+            }
+            return nil
         }
     }
 
@@ -670,6 +770,96 @@ struct ContentView: View {
             }.value
             signingIdentities = identities
         }
+    }
+}
+
+private struct BuildLogLineView: View {
+    let line: String
+
+    private var kind: BuildLogLineKind {
+        BuildLogLineKind(line: line)
+    }
+
+    var body: some View {
+        Text(line.isEmpty ? " " : line)
+            .font(.system(.caption, design: .monospaced).weight(kind.weight))
+            .foregroundStyle(Color(nsColor: kind.textColor))
+            .padding(.horizontal, kind.hasBadge ? 6 : 0)
+            .padding(.vertical, kind.hasBadge ? 2 : 0)
+            .background {
+                if let backgroundColor = kind.backgroundColor {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color(nsColor: backgroundColor))
+                }
+            }
+    }
+}
+
+private enum BuildLogLineKind {
+    case stage
+    case success
+    case error
+    case skipped
+    case command
+    case normal
+
+    init(line: String) {
+        if line.hasPrefix("[stage]") {
+            self = .stage
+        } else if line.hasPrefix("[ok]") {
+            self = .success
+        } else if line.hasPrefix("[error]") || line.localizedCaseInsensitiveContains("failed") {
+            self = .error
+        } else if line.hasPrefix("[skip]") {
+            self = .skipped
+        } else if line.hasPrefix("$ ") {
+            self = .command
+        } else {
+            self = .normal
+        }
+    }
+
+    var weight: Font.Weight {
+        switch self {
+        case .stage, .success, .error:
+            return .semibold
+        case .skipped, .command, .normal:
+            return .regular
+        }
+    }
+
+    var textColor: NSColor {
+        switch self {
+        case .stage:
+            return .systemBlue
+        case .success:
+            return .systemGreen
+        case .error:
+            return .systemRed
+        case .skipped, .command:
+            return .secondaryLabelColor
+        case .normal:
+            return .labelColor
+        }
+    }
+
+    var backgroundColor: NSColor? {
+        switch self {
+        case .stage:
+            return NSColor.systemBlue.withAlphaComponent(0.12)
+        case .success:
+            return NSColor.systemGreen.withAlphaComponent(0.12)
+        case .error:
+            return NSColor.systemRed.withAlphaComponent(0.14)
+        case .skipped:
+            return NSColor.secondaryLabelColor.withAlphaComponent(0.08)
+        case .command, .normal:
+            return nil
+        }
+    }
+
+    var hasBadge: Bool {
+        backgroundColor != nil
     }
 }
 
@@ -782,7 +972,7 @@ private struct InstallerWindowPreview: View {
 
                 HStack(spacing: 0) {
                     stepSidebar
-                        .frame(width: 190)
+                        .frame(width: 182)
 
                     Rectangle()
                         .fill(Color(nsColor: style.dividerColor))
@@ -864,15 +1054,15 @@ private struct InstallerWindowPreview: View {
     }
 
     private var stepSidebar: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 6) {
             ForEach(Array(previewSteps.enumerated()), id: \.offset) { index, step in
-                HStack(spacing: 12) {
+                HStack(spacing: 8) {
                     Circle()
                         .fill(Color(nsColor: index == selectedStepIndex ? style.stepDotActiveColor : style.stepDotInactiveColor))
-                        .frame(width: 10, height: 10)
+                        .frame(width: 7, height: 7)
 
                     Text(step)
-                        .font(.headline.weight(index == selectedStepIndex ? .semibold : .regular))
+                        .font(.system(size: 13, weight: index == selectedStepIndex ? .semibold : .regular))
                         .foregroundStyle(Color(nsColor: index == selectedStepIndex ? style.stepTextActiveColor : style.stepTextInactiveColor))
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -881,16 +1071,17 @@ private struct InstallerWindowPreview: View {
 
             Spacer()
         }
-        .padding(.top, 66)
-        .padding(.horizontal, 28)
+        .padding(.top, 42)
+        .padding(.leading, 24)
+        .padding(.trailing, 16)
         .frame(maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: style.sidebarColor).opacity(backgroundImage == nil ? 1 : 0.82))
+        .background(backgroundImage == nil ? Color(nsColor: style.sidebarColor) : Color.clear)
     }
 
     private var contentPane: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(pageHeading)
-                .font(.title2.weight(.semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Color(nsColor: style.headingTextColor))
                 .lineLimit(2)
 
@@ -910,10 +1101,10 @@ private struct InstallerWindowPreview: View {
                 InstallerPreviewButton(title: localization.t("button.continue"), style: style)
             }
         }
-        .padding(.top, 24)
+        .padding(.top, 8)
         .padding(.leading, 30)
         .padding(.trailing, 28)
-        .padding(.bottom, 20)
+        .padding(.bottom, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(contentBackground)
     }
@@ -921,10 +1112,10 @@ private struct InstallerWindowPreview: View {
     private var previewSteps: [String] {
         var steps = [localization.t("preview.step.introduction")]
         if hasResource(for: .readme) || page == .readme {
-            steps.append(localization.t("page.readme"))
+            steps.append(localization.t("preview.step.readme"))
         }
         if hasResource(for: .license) || page == .license {
-            steps.append(localization.t("page.license"))
+            steps.append(localization.t("preview.step.license"))
         }
         steps.append(contentsOf: [
             localization.t("preview.step.destination"),
@@ -1540,9 +1731,35 @@ private extension LocalizedInstallerResource {
     }
 }
 
+private extension ProjectInputValidationIssue {
+    @MainActor
+    func localizedDescription(fieldName: String, localization: AppLocalization) -> String {
+        switch self {
+        case .required:
+            return localization.t("validation.required", fieldName)
+        case .reservedDotName:
+            return localization.t("validation.reservedDotName", fieldName)
+        case .startsWithDot:
+            return localization.t("validation.startsWithDot", fieldName)
+        case .containsSlash:
+            return localization.t("validation.containsSlash", fieldName)
+        case .containsColon:
+            return localization.t("validation.containsColon", fieldName)
+        case .containsControlCharacter:
+            return localization.t("validation.containsControlCharacter", fieldName)
+        case .tooLong(let maxBytes):
+            return localization.t("validation.tooLong", fieldName, maxBytes)
+        }
+    }
+}
+
 private extension String {
     var trimmed: String {
         trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func droppingBuildLogPrefix(_ prefix: String) -> String {
+        hasPrefix(prefix) ? String(dropFirst(prefix.count)) : self
     }
 }
 
