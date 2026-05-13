@@ -161,8 +161,14 @@ struct PackageBuildService {
         guard !project.productIdentifier.trimmed.isEmpty else {
             throw BuildError.validation("Product identifier is required.")
         }
+        if let issue = ProjectInputValidator.validatePackageIdentifier(project.productIdentifier) {
+            throw BuildError.validation(issue.englishDescription(fieldName: "Product identifier"))
+        }
         guard !project.productVersion.trimmed.isEmpty else {
             throw BuildError.validation("Product version is required.")
+        }
+        if let issue = ProjectInputValidator.validateMinimumMacOSVersion(project.minimumSystemVersion) {
+            throw BuildError.validation(issue.englishDescription(fieldName: "Minimum macOS"))
         }
         if let issue = ProjectInputValidator.validateProductFileName(ProjectInputValidator.productFileNameCandidate(for: project)) {
             throw BuildError.validation(issue.englishDescription(fieldName: "Product file name"))
@@ -227,6 +233,9 @@ struct PackageBuildService {
             }
             guard !component.packageIdentifier.trimmed.isEmpty else {
                 throw BuildError.validation("Component '\(component.name)' needs a package identifier.")
+            }
+            if let issue = ProjectInputValidator.validatePackageIdentifier(component.packageIdentifier) {
+                throw BuildError.validation(issue.englishDescription(fieldName: "Component '\(component.name)' identifier"))
             }
             if component.isRequired && !component.isSelected {
                 throw BuildError.validation("Component '\(component.name)' is required and must be selected by default.")
@@ -294,9 +303,6 @@ struct PackageBuildService {
             let contents = try fileManager.contentsOfDirectory(at: sourceURL, includingPropertiesForKeys: nil)
             for sourceChild in contents {
                 try copyReplacingItem(from: sourceChild, to: destinationRoot.appendingPathComponent(sourceChild.lastPathComponent))
-            }
-            if contents.isEmpty {
-                return [payload.destinationPath.normalizedAbsolutePath]
             }
             return contents.map { payload.destinationPath.appendingPathComponent($0.lastPathComponent) }
         }
@@ -537,14 +543,16 @@ struct PackageBuildService {
 
         let minimumSystemCheck: String
         if !project.minimumSystemVersion.trimmed.isEmpty {
+            let minimumVersion = project.minimumSystemVersion.trimmed.javaScriptSingleQuotedStringEscaped
+            let productName = project.productName.javaScriptSingleQuotedStringEscaped
             minimumSystemCheck = """
                 <installation-check script="checkMinimumSystemVersion()"/>
                 <script>
                 <![CDATA[
                 function checkMinimumSystemVersion() {
-                    if (system.compareVersions(system.version.ProductVersion, '\(project.minimumSystemVersion.trimmed)') < 0) {
+                    if (system.compareVersions(system.version.ProductVersion, '\(minimumVersion)') < 0) {
                         my.result.title = 'Unsupported macOS Version';
-                        my.result.message = '\(project.productName) requires macOS \(project.minimumSystemVersion.trimmed) or later.';
+                        my.result.message = '\(productName) requires macOS \(minimumVersion) or later.';
                         my.result.type = 'Fatal';
                         return false;
                     }
@@ -672,10 +680,12 @@ struct PackageBuildService {
         let outputURL = outputDirectory.appendingPathComponent(project.uninstallerFileName)
         let removeLines = components
             .flatMap(\.installedPayloadPaths)
-            .map { #"remove_path "\#($0.shellEscapedForScript)""# }
+            .uniqued()
+            .sortedByPathDepthDescending()
+            .map { "remove_path \($0.shellSingleQuoted)" }
             .joined(separator: "\n")
         let forgetLines = components
-            .map { #"forget_receipt "\#($0.component.packageIdentifier.shellEscapedForScript)""# }
+            .map { "forget_receipt \($0.component.packageIdentifier.shellSingleQuoted)" }
             .joined(separator: "\n")
 
         let script = """
@@ -689,8 +699,20 @@ struct PackageBuildService {
 
         remove_path() {
           local target="$1"
+          if [[ -z "$target" ]]; then
+            return 0
+          fi
+          if [[ "$target" != "/" ]]; then
+            target="${target%/}"
+          fi
+          case "$target" in
+            "/"|"/Applications"|"/Library"|"/Library/Application Support"|"/System"|"/Users"|"/usr"|"/bin"|"/sbin"|"/var"|"/private"|"/etc"|"/tmp")
+              echo "Skipped protected path $target"
+              return 0
+              ;;
+          esac
           if [[ -e "$target" || -L "$target" ]]; then
-            rm -rf "$target"
+            rm -rf -- "$target"
             echo "Removed $target"
           fi
         }
@@ -730,17 +752,59 @@ struct PackageBuildService {
         process.standardOutput = pipe
         process.standardError = pipe
 
-        try process.run()
+        let outputCollector = ProcessOutputCollector(log: log)
+        pipe.fileHandleForReading.readabilityHandler = { handle in
+            outputCollector.append(handle.availableData)
+        }
 
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        try process.run()
         process.waitUntilExit()
 
-        if let output = String(data: data, encoding: .utf8), !output.trimmed.isEmpty {
-            await log(output.trimmed)
-        }
+        pipe.fileHandleForReading.readabilityHandler = nil
+        outputCollector.append(pipe.fileHandleForReading.readDataToEndOfFile())
+        await outputCollector.flush()
 
         guard process.terminationStatus == 0 else {
             throw BuildError.commandFailed(launchPath, process.terminationStatus)
+        }
+    }
+}
+
+private final class ProcessOutputCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var pendingText = ""
+    private let log: @MainActor (String) -> Void
+
+    init(log: @escaping @MainActor (String) -> Void) {
+        self.log = log
+    }
+
+    func append(_ data: Data) {
+        guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+
+        let lines: [String]
+        lock.lock()
+        pendingText += text
+        var parts = pendingText.components(separatedBy: .newlines)
+        pendingText = parts.popLast() ?? ""
+        lines = parts
+        lock.unlock()
+
+        for line in lines where !line.trimmed.isEmpty {
+            Task { await log(line) }
+        }
+    }
+
+    @MainActor
+    func flush() {
+        let line: String
+        lock.lock()
+        line = pendingText
+        pendingText = ""
+        lock.unlock()
+
+        if !line.trimmed.isEmpty {
+            log(line.trimmed)
         }
     }
 }
@@ -818,11 +882,63 @@ private extension String {
         return "'\(replacingOccurrences(of: "'", with: "'\\''"))'"
     }
 
+    var shellSingleQuoted: String {
+        "'\(replacingOccurrences(of: "'", with: "'\\''"))'"
+    }
+
+    var javaScriptSingleQuotedStringEscaped: String {
+        unicodeScalars.map { scalar in
+            switch scalar {
+            case "'":
+                return #"\'"#
+            case "\\":
+                return "\\\\"
+            case "\n":
+                return #"\n"#
+            case "\r":
+                return #"\r"#
+            case "\t":
+                return #"\t"#
+            case "<":
+                return #"\x3C"#
+            case ">":
+                return #"\x3E"#
+            case "]":
+                return #"\x5D"#
+            case "\u{2028}":
+                return #"\u2028"#
+            case "\u{2029}":
+                return #"\u2029"#
+            default:
+                if scalar.value < 0x20 {
+                    return String(format: "\\u%04X", scalar.value)
+                }
+                return String(scalar)
+            }
+        }
+        .joined()
+    }
+
     var shellEscapedForScript: String {
         replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
             .replacingOccurrences(of: "$", with: "\\$")
             .replacingOccurrences(of: "`", with: "\\`")
+    }
+}
+
+private extension Sequence where Element: Hashable {
+    func uniqued() -> [Element] {
+        var seen = Set<Element>()
+        return filter { seen.insert($0).inserted }
+    }
+}
+
+private extension Sequence where Element == String {
+    func sortedByPathDepthDescending() -> [String] {
+        sorted {
+            $0.split(separator: "/").count > $1.split(separator: "/").count
+        }
     }
 }
 
