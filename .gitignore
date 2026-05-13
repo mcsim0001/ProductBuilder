@@ -14,6 +14,7 @@ xcuserdata/
 # Xcode build products and reports
 DerivedData/
 .DerivedData/
+.derived-data-log-*
 build/
 Build/
 *.xcarchive

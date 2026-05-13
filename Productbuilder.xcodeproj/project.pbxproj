@@ -25,7 +25,7 @@
 			containerPortal = 9C96E2F02C05A10000420001 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 9C96E3282C06000000420001;
-			remoteInfo = productbuilder;
+			remoteInfo = ProductbuilderCLI;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -123,9 +123,9 @@
 				productReference = 9C96E2F82C05A10000420001 /* Productbuilder.app */;
 				productType = "com.apple.product-type.application";
 			};
-			9C96E3282C06000000420001 /* productbuilder */ = {
+			9C96E3282C06000000420001 /* ProductbuilderCLI */ = {
 				isa = PBXNativeTarget;
-				buildConfigurationList = 9C96E32B2C06000000420001 /* Build configuration list for PBXNativeTarget "productbuilder" */;
+				buildConfigurationList = 9C96E32B2C06000000420001 /* Build configuration list for PBXNativeTarget "ProductbuilderCLI" */;
 				buildPhases = (
 					9C96E3262C06000000420001 /* Sources */,
 					9C96E3252C06000000420001 /* Frameworks */,
@@ -134,7 +134,7 @@
 				);
 				dependencies = (
 				);
-				name = productbuilder;
+				name = ProductbuilderCLI;
 				productName = productbuilder;
 				productReference = 9C96E3232C06000000420001 /* productbuilder */;
 				productType = "com.apple.product-type.tool";
@@ -172,7 +172,7 @@
 			projectRoot = "";
 				targets = (
 					9C96E2F72C05A10000420001 /* Productbuilder */,
-					9C96E3282C06000000420001 /* productbuilder */,
+					9C96E3282C06000000420001 /* ProductbuilderCLI */,
 				);
 		};
 /* End PBXProject section */
@@ -253,7 +253,7 @@
 /* Begin PBXTargetDependency section */
 		9C96E3612C08000000420001 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 9C96E3282C06000000420001 /* productbuilder */;
+			target = 9C96E3282C06000000420001 /* ProductbuilderCLI */;
 			targetProxy = 9C96E3602C08000000420001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -383,11 +383,10 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Productbuilder;
-				INFOPLIST_KEY_CFBundleIconFile = AppIcon;
-				INFOPLIST_KEY_CFBundleIconName = AppIcon;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+					GENERATE_INFOPLIST_FILE = YES;
+					INFOPLIST_KEY_CFBundleDisplayName = Productbuilder;
+					INFOPLIST_KEY_CFBundleIconName = AppIcon;
+					INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 mcsim";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -411,11 +410,10 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Productbuilder;
-				INFOPLIST_KEY_CFBundleIconFile = AppIcon;
-				INFOPLIST_KEY_CFBundleIconName = AppIcon;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+					GENERATE_INFOPLIST_FILE = YES;
+					INFOPLIST_KEY_CFBundleDisplayName = Productbuilder;
+					INFOPLIST_KEY_CFBundleIconName = AppIcon;
+					INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 mcsim";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -486,7 +484,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		9C96E32B2C06000000420001 /* Build configuration list for PBXNativeTarget "productbuilder" */ = {
+		9C96E32B2C06000000420001 /* Build configuration list for PBXNativeTarget "ProductbuilderCLI" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				9C96E3292C06000000420001 /* Debug */,
