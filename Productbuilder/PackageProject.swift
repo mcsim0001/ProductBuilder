@@ -70,6 +70,8 @@ enum ProjectInputValidationIssue: Equatable {
     case containsColon
     case containsControlCharacter
     case tooLong(maxBytes: Int)
+    case invalidIdentifier
+    case invalidMacOSVersion
 
     func englishDescription(fieldName: String) -> String {
         switch self {
@@ -87,6 +89,10 @@ enum ProjectInputValidationIssue: Equatable {
             return "\(fieldName) cannot contain control characters."
         case .tooLong(let maxBytes):
             return "\(fieldName) is too long. macOS file names are limited to \(maxBytes) bytes in UTF-8."
+        case .invalidIdentifier:
+            return "\(fieldName) must use reverse-DNS format, for example com.example.product."
+        case .invalidMacOSVersion:
+            return "\(fieldName) must be a macOS version such as 13, 13.0, or 13.0.1."
         }
     }
 }
@@ -100,6 +106,27 @@ enum ProjectInputValidator {
 
     static func validateProductFileName(_ value: String) -> ProjectInputValidationIssue? {
         validateMacOSFileNameComponent(value)
+    }
+
+    static func validatePackageIdentifier(_ value: String) -> ProjectInputValidationIssue? {
+        let identifier = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !identifier.isEmpty else { return .required }
+        guard identifier.range(
+            of: #"^[A-Za-z0-9][A-Za-z0-9-]*(\.[A-Za-z0-9][A-Za-z0-9-]*)+$"#,
+            options: .regularExpression
+        ) != nil else {
+            return .invalidIdentifier
+        }
+        return nil
+    }
+
+    static func validateMinimumMacOSVersion(_ value: String) -> ProjectInputValidationIssue? {
+        let version = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !version.isEmpty else { return nil }
+        guard version.range(of: #"^[0-9]+(\.[0-9]+){0,2}$"#, options: .regularExpression) != nil else {
+            return .invalidMacOSVersion
+        }
+        return nil
     }
 
     static func productFileNameCandidate(for project: PackageProject) -> String {

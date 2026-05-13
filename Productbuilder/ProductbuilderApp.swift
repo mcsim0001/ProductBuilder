@@ -14,7 +14,7 @@ struct ProductbuilderApp: App {
             ContentView()
                 .environmentObject(model)
                 .environmentObject(localization)
-                .frame(minWidth: 1120, minHeight: 720)
+                .frame(minWidth: ProductbuilderLayout.windowMinWidth, minHeight: ProductbuilderLayout.windowMinHeight)
                 .sheet(isPresented: $showsHelp) {
                     ProductbuilderHelpView()
                         .environmentObject(localization)

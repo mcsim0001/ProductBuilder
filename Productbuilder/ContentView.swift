@@ -8,6 +8,19 @@ private enum ConfigurationTab: Hashable {
     case preview
 }
 
+enum ProductbuilderLayout {
+    static let sidebarMinWidth: CGFloat = 280
+    static let sidebarIdealWidth: CGFloat = 320
+    static let sidebarMaxWidth: CGFloat = 420
+    static let configurationMinWidth: CGFloat = 620
+    static let configurationIdealWidth: CGFloat = 760
+    static let logMinWidth: CGFloat = 360
+    static let logIdealWidth: CGFloat = 420
+    static let logMaxWidth: CGFloat = 560
+    static let windowMinWidth: CGFloat = sidebarMinWidth + configurationMinWidth + logMinWidth
+    static let windowMinHeight: CGFloat = 720
+}
+
 struct ContentView: View {
     @EnvironmentObject private var model: PackageProjectModel
     @EnvironmentObject private var localization: AppLocalization
@@ -16,17 +29,26 @@ struct ContentView: View {
     @State private var selectedConfigurationTab: ConfigurationTab = .component
 
     var body: some View {
-        NavigationSplitView {
+        HSplitView {
             componentSidebar
-        } detail: {
-            HSplitView {
-                configurationView
-                    .frame(minWidth: 520)
 
-                logView
-                    .frame(minWidth: 320)
-            }
+            configurationView
+                .frame(
+                    minWidth: ProductbuilderLayout.configurationMinWidth,
+                    idealWidth: ProductbuilderLayout.configurationIdealWidth,
+                    maxWidth: .infinity,
+                    maxHeight: .infinity
+                )
+
+            logView
+                .frame(
+                    minWidth: ProductbuilderLayout.logMinWidth,
+                    idealWidth: ProductbuilderLayout.logIdealWidth,
+                    maxWidth: ProductbuilderLayout.logMaxWidth,
+                    maxHeight: .infinity
+                )
         }
+        .frame(minWidth: ProductbuilderLayout.windowMinWidth, minHeight: ProductbuilderLayout.windowMinHeight)
         .toolbar {
             ToolbarItemGroup {
                 Button {
@@ -168,12 +190,12 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
         }
-        .navigationTitle(localization.t("components.title"))
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .navigationSplitViewColumnWidth(
-            min: 260,
-            ideal: 300,
-            max: 420
+        .frame(
+            minWidth: ProductbuilderLayout.sidebarMinWidth,
+            idealWidth: ProductbuilderLayout.sidebarIdealWidth,
+            maxWidth: ProductbuilderLayout.sidebarMaxWidth,
+            maxHeight: .infinity,
+            alignment: .leading
         )
     }
 
@@ -247,7 +269,13 @@ struct ContentView: View {
 
                 GridRow {
                     Text(localization.t("field.identifier"))
-                    TextField("com.example.product", text: $model.project.productIdentifier)
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("com.example.product", text: $model.project.productIdentifier)
+                        validationMessage(
+                            for: ProjectInputValidator.validatePackageIdentifier(model.project.productIdentifier),
+                            fieldName: localization.t("field.identifier")
+                        )
+                    }
                 }
 
                 GridRow {
@@ -424,8 +452,14 @@ struct ContentView: View {
             Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 12) {
                 GridRow {
                     Text(localization.t("field.minimumMacOS"))
-                    MacOSVersionPicker(selection: $model.project.minimumSystemVersion)
-                        .frame(maxWidth: 260)
+                    VStack(alignment: .leading, spacing: 4) {
+                        MacOSVersionPicker(selection: $model.project.minimumSystemVersion)
+                            .frame(maxWidth: 260)
+                        validationMessage(
+                            for: ProjectInputValidator.validateMinimumMacOSVersion(model.project.minimumSystemVersion),
+                            fieldName: localization.t("field.minimumMacOS")
+                        )
+                    }
                 }
 
                 GridRow {
@@ -493,7 +527,13 @@ struct ContentView: View {
 
                 GridRow {
                     Text(localization.t("field.identifier"))
-                    TextField("com.example.product.app", text: binding(\.packageIdentifier))
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("com.example.product.app", text: binding(\.packageIdentifier))
+                        validationMessage(
+                            for: model.selectedComponent.flatMap { ProjectInputValidator.validatePackageIdentifier($0.packageIdentifier) },
+                            fieldName: localization.t("field.identifier")
+                        )
+                    }
                 }
 
                 GridRow {
@@ -751,15 +791,52 @@ struct ContentView: View {
         log.components(separatedBy: .newlines).compactMap { line in
             let trimmedLine = line.trimmed
             if trimmedLine.hasPrefix("[ok] ") {
-                return "\(localization.t("buildStatus.success")): \(trimmedLine.droppingBuildLogPrefix("[ok] "))"
+                return "\(localization.t("buildStatus.success")): \(localizedBuildStageDescription(trimmedLine.droppingBuildLogPrefix("[ok] ")))"
             }
             if trimmedLine.hasPrefix("[error] ") {
-                return "\(localization.t("buildStatus.error")): \(trimmedLine.droppingBuildLogPrefix("[error] "))"
+                return "\(localization.t("buildStatus.error")): \(localizedBuildStageDescription(trimmedLine.droppingBuildLogPrefix("[error] ")))"
             }
             if trimmedLine.hasPrefix("[skip] ") {
-                return "\(localization.t("buildStatus.skipped")): \(trimmedLine.droppingBuildLogPrefix("[skip] "))"
+                return "\(localization.t("buildStatus.skipped")): \(localizedBuildStageDescription(trimmedLine.droppingBuildLogPrefix("[skip] ")))"
             }
             return nil
+        }
+    }
+
+    private func localizedBuildStageDescription(_ rawDescription: String) -> String {
+        let description = rawDescription.trimmed
+        if description.hasPrefix("Create component packages") {
+            let count = description
+                .components(separatedBy: "(")
+                .last?
+                .replacingOccurrences(of: ")", with: "")
+                ?? ""
+            return localization.t("buildStage.createComponents", count)
+        }
+
+        switch description {
+        case "Check project settings and resources":
+            return localization.t("buildStage.check")
+        case "Prepare build workspace":
+            return localization.t("buildStage.workspace")
+        case "Prepare installer resources":
+            return localization.t("buildStage.resources")
+        case "Prepare installer resources: none configured":
+            return localization.t("buildStage.resourcesNone")
+        case "Create Distribution XML":
+            return localization.t("buildStage.distribution")
+        case "Create product package":
+            return localization.t("buildStage.product")
+        case "Create and sign product package":
+            return localization.t("buildStage.productSigned")
+        case "Sign product package: no signing identity selected":
+            return localization.t("buildStage.signSkipped")
+        case "Create uninstaller script":
+            return localization.t("buildStage.uninstaller")
+        case "Create uninstaller script: disabled":
+            return localization.t("buildStage.uninstallerDisabled")
+        default:
+            return description
         }
     }
 
@@ -1749,6 +1826,10 @@ private extension ProjectInputValidationIssue {
             return localization.t("validation.containsControlCharacter", fieldName)
         case .tooLong(let maxBytes):
             return localization.t("validation.tooLong", fieldName, maxBytes)
+        case .invalidIdentifier:
+            return localization.t("validation.invalidIdentifier", fieldName)
+        case .invalidMacOSVersion:
+            return localization.t("validation.invalidMacOSVersion", fieldName)
         }
     }
 }

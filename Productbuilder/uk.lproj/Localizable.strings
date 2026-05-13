@@ -192,6 +192,17 @@
 "buildStatus.success" = "Успішно";
 "buildStatus.error" = "Помилка";
 "buildStatus.skipped" = "Пропущено";
+"buildStage.check" = "Перевірка налаштувань проєкту та ресурсів";
+"buildStage.workspace" = "Підготовка робочої папки збірки";
+"buildStage.createComponents" = "Створення компонентних пакетів (%@)";
+"buildStage.resources" = "Підготовка ресурсів інсталятора";
+"buildStage.resourcesNone" = "Підготовка ресурсів інсталятора: не задано";
+"buildStage.distribution" = "Створення Distribution XML";
+"buildStage.product" = "Створення продуктового пакета";
+"buildStage.productSigned" = "Створення та підписання продуктового пакета";
+"buildStage.signSkipped" = "Підписання продуктового пакета: сертифікат не вибрано";
+"buildStage.uninstaller" = "Створення скрипта видалення";
+"buildStage.uninstallerDisabled" = "Створення скрипта видалення: вимкнено";
 "cli.install.success.title" = "Інструмент командного рядка встановлено";
 "cli.install.success.message" = "Команда `%@` тепер вказує на:\n%@\n\nЇї можна використовувати в Terminal, наприклад:\nproductbuilder build /path/to/project.json --output ~/Desktop/build";
 "cli.install.failure.title" = "Не вдалося встановити інструмент командного рядка";
@@ -205,6 +216,8 @@
 "validation.containsColon" = "%@ не може містити \":\".";
 "validation.containsControlCharacter" = "%@ не може містити керуючі символи.";
 "validation.tooLong" = "%@ задовга. macOS обмежує назви файлів %d байтами в UTF-8.";
+"validation.invalidIdentifier" = "%@ має бути у reverse-DNS форматі, наприклад com.example.product.";
+"validation.invalidMacOSVersion" = "%@ має бути версією macOS, наприклад 13, 13.0 або 13.0.1.";
 "recent.missing" = "Останній проєкт не знайдено: %@";
 "scaling.proportional" = "Пропорційно";
 "scaling.toFit" = "Вписати";

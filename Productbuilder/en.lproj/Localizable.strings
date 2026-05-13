@@ -192,6 +192,17 @@
 "buildStatus.success" = "Success";
 "buildStatus.error" = "Error";
 "buildStatus.skipped" = "Skipped";
+"buildStage.check" = "Check project settings and resources";
+"buildStage.workspace" = "Prepare build workspace";
+"buildStage.createComponents" = "Create component packages (%@)";
+"buildStage.resources" = "Prepare installer resources";
+"buildStage.resourcesNone" = "Prepare installer resources: none configured";
+"buildStage.distribution" = "Create Distribution XML";
+"buildStage.product" = "Create product package";
+"buildStage.productSigned" = "Create and sign product package";
+"buildStage.signSkipped" = "Sign product package: no signing identity selected";
+"buildStage.uninstaller" = "Create uninstaller script";
+"buildStage.uninstallerDisabled" = "Create uninstaller script: disabled";
 "cli.install.success.title" = "Command Line Tool Installed";
 "cli.install.success.message" = "The command `%@` now points to:\n%@\n\nYou can use it from Terminal, for example:\nproductbuilder build /path/to/project.json --output ~/Desktop/build";
 "cli.install.failure.title" = "Could Not Install Command Line Tool";
@@ -205,6 +216,8 @@
 "validation.containsColon" = "%@ cannot contain \":\".";
 "validation.containsControlCharacter" = "%@ cannot contain control characters.";
 "validation.tooLong" = "%@ is too long. macOS file names are limited to %d bytes in UTF-8.";
+"validation.invalidIdentifier" = "%@ must use reverse-DNS format, for example com.example.product.";
+"validation.invalidMacOSVersion" = "%@ must be a macOS version such as 13, 13.0, or 13.0.1.";
 "recent.missing" = "Recent project not found: %@";
 "scaling.proportional" = "Proportional";
 "scaling.toFit" = "To Fit";
