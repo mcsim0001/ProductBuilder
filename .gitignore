@@ -15,6 +15,7 @@ xcuserdata/
 DerivedData/
 .DerivedData/
 .derived-data-log-*
+Products/
 build/
 Build/
 *.xcarchive
