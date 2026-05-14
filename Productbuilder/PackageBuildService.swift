@@ -92,6 +92,38 @@ struct PackageBuildService {
         if project.signingIdentity.trimmed.isEmpty {
             await logSkip("Sign product package: no signing identity selected", log: log)
         }
+
+        if project.enableNotarization {
+            try await runStage("Notarize product package", log: log) {
+                try await run(
+                    "/usr/bin/xcrun",
+                    arguments: [
+                        "notarytool",
+                        "submit",
+                        outputURL.path,
+                        "--keychain-profile",
+                        project.notarizationProfile.trimmed,
+                        "--wait"
+                    ],
+                    log: log
+                )
+            }
+
+            try await runStage("Staple notarization ticket", log: log) {
+                try await run(
+                    "/usr/bin/xcrun",
+                    arguments: [
+                        "stapler",
+                        "staple",
+                        outputURL.path
+                    ],
+                    log: log
+                )
+            }
+        } else {
+            await logSkip("Notarize product package: disabled", log: log)
+        }
+
         await log("Product package: \(outputURL.path)")
 
         let uninstallerURL: URL?
@@ -172,6 +204,14 @@ struct PackageBuildService {
         }
         if let issue = ProjectInputValidator.validateProductFileName(ProjectInputValidator.productFileNameCandidate(for: project)) {
             throw BuildError.validation(issue.englishDescription(fieldName: "Product file name"))
+        }
+        if project.enableNotarization {
+            guard !project.signingIdentity.trimmed.isEmpty else {
+                throw BuildError.validation("Notarization requires a signing identity.")
+            }
+            guard !project.notarizationProfile.trimmed.isEmpty else {
+                throw BuildError.validation("Notarization keychain profile is required.")
+            }
         }
         guard !project.outputDirectory.trimmed.isEmpty else {
             throw BuildError.validation("Output directory is required.")

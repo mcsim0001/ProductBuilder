@@ -297,7 +297,10 @@ struct ContentView: View {
 
                 GridRow {
                     Text(localization.t("field.output"))
-                    PathField(path: $model.project.outputDirectory, mode: .directory)
+                    VStack(alignment: .leading, spacing: 6) {
+                        PathField(path: $model.project.outputDirectory, mode: .directory)
+                        Toggle(localization.t("toggle.openOutputAfterBuild"), isOn: $model.project.openOutputDirectoryAfterBuild)
+                    }
                 }
 
                 GridRow {
@@ -308,6 +311,11 @@ struct ContentView: View {
                 GridRow {
                     Text(localization.t("field.signing"))
                     signingIdentityField
+                }
+
+                GridRow {
+                    Text(localization.t("field.notarization"))
+                    notarizationField
                 }
             }
             .textFieldStyle(.roundedBorder)
@@ -321,8 +329,10 @@ struct ContentView: View {
                     localization.t("help.product.version"),
                     localization.t("help.product.fileName"),
                     localization.t("help.product.output"),
+                    localization.t("help.product.openOutputAfterBuild"),
                     localization.t("help.product.resources"),
-                    localization.t("help.product.signing")
+                    localization.t("help.product.signing"),
+                    localization.t("help.product.notarization")
                 ]
             )
         }
@@ -635,6 +645,36 @@ struct ContentView: View {
         }
     }
 
+    private var notarizationField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(localization.t("toggle.enableNotarization"), isOn: $model.project.enableNotarization)
+
+            HStack(spacing: 8) {
+                Text(localization.t("field.notarizationProfile"))
+                    .foregroundStyle(model.project.enableNotarization ? .primary : .secondary)
+                TextField(localization.t("placeholder.notarizationProfile"), text: $model.project.notarizationProfile)
+                    .disabled(!model.project.enableNotarization)
+                    .frame(maxWidth: 360)
+            }
+
+            if model.project.enableNotarization {
+                if model.project.signingIdentity.trimmed.isEmpty {
+                    Text(localization.t("notarization.requiresSigning"))
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if model.project.notarizationProfile.trimmed.isEmpty {
+                    Text(localization.t("notarization.profileRequired"))
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
     private var logView: some View {
         VStack(spacing: 0) {
             HStack {
@@ -743,6 +783,9 @@ struct ContentView: View {
                     model.appendLog(localization.t("buildLog.uninstaller", uninstallerURL.path))
                 }
                 model.isBuilding = false
+                if project.openOutputDirectoryAfterBuild {
+                    revealBuildOutput(result.outputURL)
+                }
                 showBuildCompletionAlert(succeeded: true, project: project, result: result, error: nil)
             } catch {
                 model.appendLog(localization.t("buildLog.failed", error.localizedDescription))
@@ -750,6 +793,10 @@ struct ContentView: View {
                 showBuildCompletionAlert(succeeded: false, project: project, result: nil, error: error)
             }
         }
+    }
+
+    private func revealBuildOutput(_ outputURL: URL) {
+        NSWorkspace.shared.activateFileViewerSelecting([outputURL])
     }
 
     private func showBuildCompletionAlert(
@@ -831,6 +878,12 @@ struct ContentView: View {
             return localization.t("buildStage.productSigned")
         case "Sign product package: no signing identity selected":
             return localization.t("buildStage.signSkipped")
+        case "Notarize product package":
+            return localization.t("buildStage.notarization")
+        case "Notarize product package: disabled":
+            return localization.t("buildStage.notarizationDisabled")
+        case "Staple notarization ticket":
+            return localization.t("buildStage.staple")
         case "Create uninstaller script":
             return localization.t("buildStage.uninstaller")
         case "Create uninstaller script: disabled":

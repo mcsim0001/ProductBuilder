@@ -6,6 +6,7 @@ struct PackageProject: Codable, Equatable {
     var productVersion: String = "1.0.0"
     var productFileName: String = ""
     var outputDirectory: String = "\(NSHomeDirectory())/Desktop"
+    var openOutputDirectoryAfterBuild: Bool = true
     var resourcesDirectory: String = ""
     var logoPath: String = ""
     var backgroundPath: String = ""
@@ -21,6 +22,8 @@ struct PackageProject: Codable, Equatable {
     var licenseLocalizations: [LocalizedInstallerResource] = []
     var conclusionLocalizations: [LocalizedInstallerResource] = []
     var signingIdentity: String = ""
+    var enableNotarization: Bool = false
+    var notarizationProfile: String = ""
     var allowCustomize: Bool = true
     var minimumSystemVersion: String = ""
     var enableAnywhereDomain: Bool = false
@@ -232,6 +235,7 @@ extension PackageProject {
         case productVersion
         case productFileName
         case outputDirectory
+        case openOutputDirectoryAfterBuild
         case resourcesDirectory
         case logoPath
         case backgroundPath
@@ -247,6 +251,8 @@ extension PackageProject {
         case licenseLocalizations
         case conclusionLocalizations
         case signingIdentity
+        case enableNotarization
+        case notarizationProfile
         case allowCustomize
         case minimumSystemVersion
         case enableAnywhereDomain
@@ -268,6 +274,7 @@ extension PackageProject {
         productVersion = try container.decodeIfPresent(String.self, forKey: .productVersion) ?? productVersion
         productFileName = try container.decodeIfPresent(String.self, forKey: .productFileName) ?? productFileName
         outputDirectory = try container.decodeIfPresent(String.self, forKey: .outputDirectory) ?? outputDirectory
+        openOutputDirectoryAfterBuild = try container.decodeIfPresent(Bool.self, forKey: .openOutputDirectoryAfterBuild) ?? openOutputDirectoryAfterBuild
         resourcesDirectory = try container.decodeIfPresent(String.self, forKey: .resourcesDirectory) ?? resourcesDirectory
         logoPath = try container.decodeIfPresent(String.self, forKey: .logoPath) ?? logoPath
         backgroundPath = try container.decodeIfPresent(String.self, forKey: .backgroundPath) ?? backgroundPath
@@ -283,6 +290,8 @@ extension PackageProject {
         licenseLocalizations = try container.decodeIfPresent([LocalizedInstallerResource].self, forKey: .licenseLocalizations) ?? licenseLocalizations
         conclusionLocalizations = try container.decodeIfPresent([LocalizedInstallerResource].self, forKey: .conclusionLocalizations) ?? conclusionLocalizations
         signingIdentity = try container.decodeIfPresent(String.self, forKey: .signingIdentity) ?? signingIdentity
+        enableNotarization = try container.decodeIfPresent(Bool.self, forKey: .enableNotarization) ?? enableNotarization
+        notarizationProfile = try container.decodeIfPresent(String.self, forKey: .notarizationProfile) ?? notarizationProfile
         allowCustomize = try container.decodeIfPresent(Bool.self, forKey: .allowCustomize) ?? allowCustomize
         minimumSystemVersion = try container.decodeIfPresent(String.self, forKey: .minimumSystemVersion) ?? minimumSystemVersion
         generateUninstaller = try container.decodeIfPresent(Bool.self, forKey: .generateUninstaller) ?? generateUninstaller

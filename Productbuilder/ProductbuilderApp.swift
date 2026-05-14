@@ -346,8 +346,10 @@ private struct ProductbuilderHelpView: View {
                             localization.t("help.product.identifier"),
                             localization.t("help.product.version"),
                             localization.t("help.product.output"),
+                            localization.t("help.product.openOutputAfterBuild"),
                             localization.t("help.product.resources"),
-                            localization.t("help.product.signing")
+                            localization.t("help.product.signing"),
+                            localization.t("help.product.notarization")
                         ]
                     )
 
