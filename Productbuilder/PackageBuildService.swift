@@ -310,7 +310,10 @@ struct PackageBuildService {
             "--ownership", component.ownership.rawValue
         ]
 
-        if let scriptsDirectory = try makeScriptsDirectory(for: component, baseDirectory: componentStage) {
+        let scriptsStage = stageDirectory
+            .appendingPathComponent("PackageScripts", isDirectory: true)
+            .appendingPathComponent(component.id.uuidString, isDirectory: true)
+        if let scriptsDirectory = try makeScriptsDirectory(for: component, directory: scriptsStage) {
             arguments += ["--scripts", scriptsDirectory.path]
         }
 
@@ -356,7 +359,7 @@ struct PackageBuildService {
         try fileManager.copyItem(at: sourceURL, to: destinationURL)
     }
 
-    private func makeScriptsDirectory(for component: PackageComponent, baseDirectory: URL) throws -> URL? {
+    private func makeScriptsDirectory(for component: PackageComponent, directory scriptsDirectory: URL) throws -> URL? {
         let scripts = [
             ("preinstall", component.preinstallScriptPath.trimmed),
             ("postinstall", component.postinstallScriptPath.trimmed)
@@ -365,7 +368,6 @@ struct PackageBuildService {
         guard !scripts.isEmpty else { return nil }
 
         let fileManager = FileManager.default
-        let scriptsDirectory = baseDirectory.appendingPathComponent("Scripts", isDirectory: true)
         try fileManager.createDirectory(at: scriptsDirectory, withIntermediateDirectories: true)
 
         for (scriptName, sourcePath) in scripts {
@@ -505,16 +507,14 @@ struct PackageBuildService {
         let fileName = screenFileName(from: sourceForFileName, prefix: prefix)
         let fileManager = FileManager.default
 
-        if !path.trimmed.isEmpty {
-            try copyItem(from: URL(fileURLWithPath: path), to: resourcesURL.appendingPathComponent(fileName))
-        } else if let fallback = validLocalizations.first {
-            try copyItem(from: URL(fileURLWithPath: fallback.path), to: resourcesURL.appendingPathComponent(fileName))
-        }
-
         for localization in validLocalizations {
             let lprojDirectory = resourcesURL.appendingPathComponent("\(localization.normalizedLanguageCode).lproj", isDirectory: true)
             try fileManager.createDirectory(at: lprojDirectory, withIntermediateDirectories: true)
             try copyItem(from: URL(fileURLWithPath: localization.path), to: lprojDirectory.appendingPathComponent(fileName))
+        }
+
+        if validLocalizations.isEmpty {
+            try copyItem(from: URL(fileURLWithPath: path), to: resourcesURL.appendingPathComponent(fileName))
         }
 
         if !validLocalizations.isEmpty {
@@ -581,28 +581,16 @@ struct PackageBuildService {
             }
         ].compactMap { $0 }.joined(separator: "\n")
 
-        let minimumSystemCheck: String
+        let minimumSystemRequirement: String
         if !project.minimumSystemVersion.trimmed.isEmpty {
-            let minimumVersion = project.minimumSystemVersion.trimmed.javaScriptSingleQuotedStringEscaped
-            let productName = project.productName.javaScriptSingleQuotedStringEscaped
-            minimumSystemCheck = """
-                <installation-check script="checkMinimumSystemVersion()"/>
-                <script>
-                <![CDATA[
-                function checkMinimumSystemVersion() {
-                    if (system.compareVersions(system.version.ProductVersion, '\(minimumVersion)') < 0) {
-                        my.result.title = 'Unsupported macOS Version';
-                        my.result.message = '\(productName) requires macOS \(minimumVersion) or later.';
-                        my.result.type = 'Fatal';
-                        return false;
-                    }
-                    return true;
-                }
-                ]]>
-                </script>
+            let minimumVersion = project.minimumSystemVersion.trimmed.xmlEscaped
+            minimumSystemRequirement = """
+                <allowed-os-versions>
+                    <os-version min="\(minimumVersion)"/>
+                </allowed-os-versions>
             """
         } else {
-            minimumSystemCheck = ""
+            minimumSystemRequirement = ""
         }
 
         let outlineLines = components
@@ -635,7 +623,7 @@ struct PackageBuildService {
             \(domains)
         \(backgroundTags)
         \(screenTags)
-        \(minimumSystemCheck)
+        \(minimumSystemRequirement)
             <choices-outline>
                 <line choice="default">
         \(outlineLines)
