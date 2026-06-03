@@ -7,16 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		9C96E3142C05D30000420001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9C96E3152C05D30000420001 /* Assets.xcassets */; };
-		9C96E3402C07000000420001 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 9C96E3412C07000000420001 /* Localizable.strings */; };
 		9C96E3012C05A10000420001 /* ProductbuilderApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C96E3002C05A10000420001 /* ProductbuilderApp.swift */; };
 		9C96E3032C05A10000420001 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C96E3022C05A10000420001 /* ContentView.swift */; };
 		9C96E3052C05A10000420001 /* PackageProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C96E3042C05A10000420001 /* PackageProject.swift */; };
 		9C96E3072C05A10000420001 /* PackageBuildService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C96E3062C05A10000420001 /* PackageBuildService.swift */; };
 		9C96E3092C05A10000420001 /* ProjectDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C96E3082C05A10000420001 /* ProjectDocument.swift */; };
+		9C96E3142C05D30000420001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9C96E3152C05D30000420001 /* Assets.xcassets */; };
 		9C96E3202C06000000420001 /* ProductbuilderCLI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C96E3242C06000000420001 /* ProductbuilderCLI.swift */; };
 		9C96E3212C06000000420001 /* PackageProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C96E3042C05A10000420001 /* PackageProject.swift */; };
 		9C96E3222C06000000420001 /* PackageBuildService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C96E3062C05A10000420001 /* PackageBuildService.swift */; };
+		9C96E3402C07000000420001 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 9C96E3412C07000000420001 /* Localizable.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -63,19 +63,19 @@
 /* Begin PBXGroup section */
 		9C96E2EF2C05A10000420001 = {
 			isa = PBXGroup;
-				children = (
-					9C96E2FA2C05A10000420001 /* Productbuilder */,
-					9C96E3272C06000000420001 /* ProductbuilderCLI */,
-					9C96E2F92C05A10000420001 /* Products */,
-				);
+			children = (
+				9C96E2FA2C05A10000420001 /* Productbuilder */,
+				9C96E3272C06000000420001 /* ProductbuilderCLI */,
+				9C96E2F92C05A10000420001 /* Products */,
+			);
 			sourceTree = "<group>";
 		};
 		9C96E2F92C05A10000420001 /* Products */ = {
 			isa = PBXGroup;
-				children = (
-					9C96E2F82C05A10000420001 /* Productbuilder.app */,
-					9C96E3232C06000000420001 /* productbuilder */,
-				);
+			children = (
+				9C96E2F82C05A10000420001 /* Productbuilder.app */,
+				9C96E3232C06000000420001 /* productbuilder */,
+			);
 			name = Products;
 			sourceTree = "<group>";
 		};
@@ -90,23 +90,23 @@
 				9C96E3412C07000000420001 /* Localizable.strings */,
 				9C96E3152C05D30000420001 /* Assets.xcassets */,
 			);
-				path = Productbuilder;
-				sourceTree = "<group>";
-			};
-			9C96E3272C06000000420001 /* ProductbuilderCLI */ = {
-				isa = PBXGroup;
-				children = (
-					9C96E3242C06000000420001 /* ProductbuilderCLI.swift */,
-				);
-				path = ProductbuilderCLI;
-				sourceTree = "<group>";
-			};
+			path = Productbuilder;
+			sourceTree = "<group>";
+		};
+		9C96E3272C06000000420001 /* ProductbuilderCLI */ = {
+			isa = PBXGroup;
+			children = (
+				9C96E3242C06000000420001 /* ProductbuilderCLI.swift */,
+			);
+			path = ProductbuilderCLI;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-			9C96E2F72C05A10000420001 /* Productbuilder */ = {
-				isa = PBXNativeTarget;
-				buildConfigurationList = 9C96E3112C05A10000420001 /* Build configuration list for PBXNativeTarget "Productbuilder" */;
+		9C96E2F72C05A10000420001 /* Productbuilder */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9C96E3112C05A10000420001 /* Build configuration list for PBXNativeTarget "Productbuilder" */;
 			buildPhases = (
 				9C96E2F42C05A10000420001 /* Sources */,
 				9C96E2F52C05A10000420001 /* Frameworks */,
@@ -120,25 +120,25 @@
 			);
 			name = Productbuilder;
 			productName = Productbuilder;
-				productReference = 9C96E2F82C05A10000420001 /* Productbuilder.app */;
-				productType = "com.apple.product-type.application";
-			};
-			9C96E3282C06000000420001 /* ProductbuilderCLI */ = {
-				isa = PBXNativeTarget;
-				buildConfigurationList = 9C96E32B2C06000000420001 /* Build configuration list for PBXNativeTarget "ProductbuilderCLI" */;
-				buildPhases = (
-					9C96E3262C06000000420001 /* Sources */,
-					9C96E3252C06000000420001 /* Frameworks */,
-				);
-				buildRules = (
-				);
-				dependencies = (
-				);
-				name = ProductbuilderCLI;
-				productName = productbuilder;
-				productReference = 9C96E3232C06000000420001 /* productbuilder */;
-				productType = "com.apple.product-type.tool";
-			};
+			productReference = 9C96E2F82C05A10000420001 /* Productbuilder.app */;
+			productType = "com.apple.product-type.application";
+		};
+		9C96E3282C06000000420001 /* ProductbuilderCLI */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9C96E32B2C06000000420001 /* Build configuration list for PBXNativeTarget "ProductbuilderCLI" */;
+			buildPhases = (
+				9C96E3262C06000000420001 /* Sources */,
+				9C96E3252C06000000420001 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ProductbuilderCLI;
+			productName = productbuilder;
+			productReference = 9C96E3232C06000000420001 /* productbuilder */;
+			productType = "com.apple.product-type.tool";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -149,12 +149,12 @@
 				LastSwiftUpdateCheck = 1540;
 				LastUpgradeCheck = 1540;
 				TargetAttributes = {
-						9C96E2F72C05A10000420001 = {
-							CreatedOnToolsVersion = 15.4;
-						};
-						9C96E3282C06000000420001 = {
-							CreatedOnToolsVersion = 15.4;
-						};
+					9C96E2F72C05A10000420001 = {
+						CreatedOnToolsVersion = 15.4;
+					};
+					9C96E3282C06000000420001 = {
+						CreatedOnToolsVersion = 15.4;
+					};
 				};
 			};
 			buildConfigurationList = 9C96E2F32C05A10000420001 /* Build configuration list for PBXProject "Productbuilder" */;
@@ -170,10 +170,10 @@
 			productRefGroup = 9C96E2F92C05A10000420001 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
-				targets = (
-					9C96E2F72C05A10000420001 /* Productbuilder */,
-					9C96E3282C06000000420001 /* ProductbuilderCLI */,
-				);
+			targets = (
+				9C96E2F72C05A10000420001 /* Productbuilder */,
+				9C96E3282C06000000420001 /* ProductbuilderCLI */,
+			);
 		};
 /* End PBXProject section */
 
@@ -213,18 +213,6 @@
 		};
 /* End PBXShellScriptBuildPhase section */
 
-/* Begin PBXVariantGroup section */
-		9C96E3412C07000000420001 /* Localizable.strings */ = {
-			isa = PBXVariantGroup;
-			children = (
-				9C96E3422C07000000420001 /* en */,
-				9C96E3432C07000000420001 /* uk */,
-			);
-			name = Localizable.strings;
-			sourceTree = "<group>";
-		};
-/* End PBXVariantGroup section */
-
 /* Begin PBXSourcesBuildPhase section */
 		9C96E2F42C05A10000420001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -257,6 +245,18 @@
 			targetProxy = 9C96E3602C08000000420001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		9C96E3412C07000000420001 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				9C96E3422C07000000420001 /* en */,
+				9C96E3432C07000000420001 /* uk */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		9C96E30A2C05A10000420001 /* Debug */ = {
@@ -378,23 +378,25 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
-					GENERATE_INFOPLIST_FILE = YES;
-					INFOPLIST_KEY_CFBundleDisplayName = Productbuilder;
-					INFOPLIST_KEY_CFBundleIconName = AppIcon;
-					INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Productbuilder;
+				INFOPLIST_KEY_CFBundleIconName = AppIcon;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 mcsim";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = ua.com.mcsim.productbuilder;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -405,23 +407,29 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=macosx*]" = SKFW5Z8K7H;
 				ENABLE_HARDENED_RUNTIME = YES;
-					GENERATE_INFOPLIST_FILE = YES;
-					INFOPLIST_KEY_CFBundleDisplayName = Productbuilder;
-					INFOPLIST_KEY_CFBundleIconName = AppIcon;
-					INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Productbuilder;
+				INFOPLIST_KEY_CFBundleIconName = AppIcon;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 mcsim";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = ua.com.mcsim.productbuilder;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "";
+				SKIP_INSTALL = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -440,6 +448,7 @@
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ua.com.mcsim.productbuilder.cli;
 				PRODUCT_NAME = productbuilder;
+				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 			};
@@ -448,9 +457,12 @@
 		9C96E32A2C06000000420001 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=macosx*]" = SKFW5Z8K7H;
+				ENABLE_HARDENED_RUNTIME = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -458,6 +470,9 @@
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ua.com.mcsim.productbuilder.cli;
 				PRODUCT_NAME = productbuilder;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "";
+				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 			};
