@@ -594,6 +594,16 @@ private enum MenuLocalizer {
 enum AppLanguage: String, CaseIterable, Identifiable {
     case english = "en"
     case ukrainian = "uk"
+    case spanish = "es"
+    case chineseSimplified = "zh-Hans"
+    case hindi = "hi"
+    case arabic = "ar"
+    case bengali = "bn"
+    case portugueseBrazil = "pt-BR"
+    case indonesian = "id"
+    case french = "fr"
+    case german = "de"
+    case japanese = "ja"
 
     var id: String { rawValue }
 
@@ -603,6 +613,26 @@ enum AppLanguage: String, CaseIterable, Identifiable {
             return "English"
         case .ukrainian:
             return "Українська"
+        case .spanish:
+            return "Español"
+        case .chineseSimplified:
+            return "简体中文"
+        case .hindi:
+            return "हिन्दी"
+        case .arabic:
+            return "العربية"
+        case .bengali:
+            return "বাংলা"
+        case .portugueseBrazil:
+            return "Português (Brasil)"
+        case .indonesian:
+            return "Bahasa Indonesia"
+        case .french:
+            return "Français"
+        case .german:
+            return "Deutsch"
+        case .japanese:
+            return "日本語"
         }
     }
 }

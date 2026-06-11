@@ -41,6 +41,16 @@
 		9C96E3242C06000000420001 /* ProductbuilderCLI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductbuilderCLI.swift; sourceTree = "<group>"; };
 		9C96E3422C07000000420001 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		9C96E3432C07000000420001 /* uk */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = uk; path = uk.lproj/Localizable.strings; sourceTree = "<group>"; };
+		9C96E3702C10000000420001 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/Localizable.strings; sourceTree = "<group>"; };
+		9C96E3712C10000000420001 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		9C96E3722C10000000420001 /* hi */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = hi; path = hi.lproj/Localizable.strings; sourceTree = "<group>"; };
+		9C96E3732C10000000420001 /* ar */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ar; path = ar.lproj/Localizable.strings; sourceTree = "<group>"; };
+		9C96E3742C10000000420001 /* bn */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = bn; path = bn.lproj/Localizable.strings; sourceTree = "<group>"; };
+		9C96E3752C10000000420001 /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt-BR"; path = "pt-BR.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		9C96E3762C10000000420001 /* id */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = id; path = id.lproj/Localizable.strings; sourceTree = "<group>"; };
+		9C96E3772C10000000420001 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/Localizable.strings; sourceTree = "<group>"; };
+		9C96E3782C10000000420001 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/Localizable.strings; sourceTree = "<group>"; };
+		9C96E3792C10000000420001 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/Localizable.strings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -164,6 +174,16 @@
 			knownRegions = (
 				en,
 				uk,
+				es,
+				"zh-Hans",
+				hi,
+				ar,
+				bn,
+				"pt-BR",
+				id,
+				fr,
+				de,
+				ja,
 				Base,
 			);
 			mainGroup = 9C96E2EF2C05A10000420001;
@@ -252,6 +272,16 @@
 			children = (
 				9C96E3422C07000000420001 /* en */,
 				9C96E3432C07000000420001 /* uk */,
+				9C96E3702C10000000420001 /* es */,
+				9C96E3712C10000000420001 /* zh-Hans */,
+				9C96E3722C10000000420001 /* hi */,
+				9C96E3732C10000000420001 /* ar */,
+				9C96E3742C10000000420001 /* bn */,
+				9C96E3752C10000000420001 /* pt-BR */,
+				9C96E3762C10000000420001 /* id */,
+				9C96E3772C10000000420001 /* fr */,
+				9C96E3782C10000000420001 /* de */,
+				9C96E3792C10000000420001 /* ja */,
 			);
 			name = Localizable.strings;
 			sourceTree = "<group>";
