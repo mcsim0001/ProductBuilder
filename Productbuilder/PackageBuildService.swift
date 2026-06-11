@@ -280,6 +280,20 @@ struct PackageBuildService {
             if component.isRequired && !component.isSelected {
                 throw BuildError.validation("Component '\(component.name)' is required and must be selected by default.")
             }
+            if component.mustCloseApplications {
+                let enabledItems = component.mustCloseApplicationItems.filter(\.isEnabled)
+                guard !enabledItems.isEmpty else {
+                    throw BuildError.validation("Component '\(component.name)' requires at least one application bundle identifier to close.")
+                }
+                for item in enabledItems {
+                    guard !item.bundleIdentifier.trimmed.isEmpty else {
+                        throw BuildError.validation("Component '\(component.name)' has an empty application bundle identifier to close.")
+                    }
+                    if let issue = ProjectInputValidator.validatePackageIdentifier(item.bundleIdentifier) {
+                        throw BuildError.validation(issue.englishDescription(fieldName: "Application bundle identifier"))
+                    }
+                }
+            }
         }
     }
 
@@ -614,6 +628,29 @@ struct PackageBuildService {
                 """
             }
             .joined(separator: "\n")
+        let mustClosePackageRefs = components
+            .compactMap { component in
+                let applicationIDs = component.component.mustCloseApplicationItems
+                    .filter { component.component.mustCloseApplications && $0.isEnabled }
+                    .map { $0.bundleIdentifier.trimmed }
+                    .filter { !$0.isEmpty }
+                    .uniqued()
+
+                guard !applicationIDs.isEmpty else { return nil }
+
+                let applications = applicationIDs
+                    .map { #"            <app id="\#($0.xmlEscaped)"/>"# }
+                    .joined(separator: "\n")
+
+                return """
+                    <pkg-ref id="\(component.component.packageIdentifier.xmlEscaped)">
+                        <must-close>
+                \(applications)
+                        </must-close>
+                    </pkg-ref>
+                """
+            }
+            .joined(separator: "\n")
 
         return """
         <?xml version="1.0" encoding="utf-8"?>
@@ -632,6 +669,7 @@ struct PackageBuildService {
             <choice id="default" title="\(project.productName.xmlEscaped)"/>
         \(choices)
         \(packageRefs)
+        \(mustClosePackageRefs)
         </installer-gui-script>
         """
     }

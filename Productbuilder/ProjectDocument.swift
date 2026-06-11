@@ -256,6 +256,8 @@ enum PackagesProjectImporter {
             let scripts = package.dictionary("PACKAGE_SCRIPTS") ?? projectDictionary.dictionary("PACKAGE_SCRIPTS") ?? [:]
             let preinstall = resolvePath(scripts.dictionary("PREINSTALL_PATH"), baseURL: baseURL) ?? ""
             let postinstall = resolvePath(scripts.dictionary("POSTINSTALL_PATH"), baseURL: baseURL) ?? ""
+            let mustCloseApplications = package.bool("MUST-CLOSE-APPLICATIONS", default: false)
+            let mustCloseApplicationItems = mustCloseApplicationItems(in: package)
 
             let choices = choiceSettings(for: package.string("UUID"), presentation: presentation)
             let payloadEntries = payloadItems(in: package.dictionary("PACKAGE_FILES") ?? projectDictionary.dictionary("PACKAGE_FILES"), baseURL: baseURL)
@@ -275,7 +277,9 @@ enum PackagesProjectImporter {
                     isSelected: choices.isSelected,
                     isVisible: choices.isVisible,
                     preinstallScriptPath: preinstall,
-                    postinstallScriptPath: postinstall
+                    postinstallScriptPath: postinstall,
+                    mustCloseApplications: mustCloseApplications,
+                    mustCloseApplicationItems: mustCloseApplicationItems
                 ))
                 continue
             }
@@ -292,7 +296,9 @@ enum PackagesProjectImporter {
                 isSelected: choices.isSelected,
                 isVisible: choices.isVisible,
                 preinstallScriptPath: preinstall,
-                postinstallScriptPath: postinstall
+                postinstallScriptPath: postinstall,
+                mustCloseApplications: mustCloseApplications,
+                mustCloseApplicationItems: mustCloseApplicationItems
             ))
         }
 
@@ -317,6 +323,23 @@ enum PackagesProjectImporter {
             return packages
         }
         return [projectDictionary]
+    }
+
+    private static func mustCloseApplicationItems(in package: [String: Any]) -> [MustCloseApplicationItem] {
+        guard let items = package["MUST-CLOSE-APPLICATION-ITEMS"] as? [[String: Any]] else {
+            return []
+        }
+
+        return items.compactMap { item in
+            guard let bundleIdentifier = item.string("APPLICATION_ID")?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !bundleIdentifier.isEmpty else {
+                return nil
+            }
+            return MustCloseApplicationItem(
+                isEnabled: item.bool("STATE", default: true),
+                bundleIdentifier: bundleIdentifier
+            )
+        }
     }
 
     private static func firstLocalizedString(in dictionary: [String: Any]?) -> String? {

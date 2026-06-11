@@ -176,12 +176,26 @@ struct PackageComponent: Codable, Identifiable, Equatable {
     var isVisible: Bool = true
     var preinstallScriptPath: String = ""
     var postinstallScriptPath: String = ""
+    var mustCloseApplications: Bool = false
+    var mustCloseApplicationItems: [MustCloseApplicationItem] = []
 
     var componentPackageName: String {
         let base = name
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "/", with: "-")
         return "\((base.isEmpty ? "Component" : base)).pkg"
+    }
+}
+
+struct MustCloseApplicationItem: Codable, Identifiable, Equatable {
+    var id: UUID = UUID()
+    var isEnabled: Bool = true
+    var bundleIdentifier: String = ""
+
+    init(id: UUID = UUID(), isEnabled: Bool = true, bundleIdentifier: String = "") {
+        self.id = id
+        self.isEnabled = isEnabled
+        self.bundleIdentifier = bundleIdentifier
     }
 }
 
@@ -324,6 +338,8 @@ extension PackageComponent {
         case isVisible
         case preinstallScriptPath
         case postinstallScriptPath
+        case mustCloseApplications
+        case mustCloseApplicationItems
     }
 
     init(from decoder: Decoder) throws {
@@ -348,6 +364,8 @@ extension PackageComponent {
         isVisible = try container.decodeIfPresent(Bool.self, forKey: .isVisible) ?? isVisible
         preinstallScriptPath = try container.decodeIfPresent(String.self, forKey: .preinstallScriptPath) ?? preinstallScriptPath
         postinstallScriptPath = try container.decodeIfPresent(String.self, forKey: .postinstallScriptPath) ?? postinstallScriptPath
+        mustCloseApplications = try container.decodeIfPresent(Bool.self, forKey: .mustCloseApplications) ?? mustCloseApplications
+        mustCloseApplicationItems = try container.decodeIfPresent([MustCloseApplicationItem].self, forKey: .mustCloseApplicationItems) ?? mustCloseApplicationItems
     }
 }
 

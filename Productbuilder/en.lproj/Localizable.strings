@@ -76,6 +76,8 @@
 "language.contextTitle" = "Application Language";
 "toolbar.open" = "Open";
 "toolbar.open.help" = "Open a Productbuilder project";
+"toolbar.hideSidebar" = "Hide components sidebar";
+"toolbar.showSidebar" = "Show components sidebar";
 "toolbar.import" = "Import";
 "toolbar.import.help" = "Import a Packages .pkgproj project";
 "toolbar.save" = "Save";
@@ -129,10 +131,13 @@
 "field.choice" = "Choice";
 "field.preinstall" = "Preinstall";
 "field.postinstall" = "Postinstall";
+"field.mustCloseApplications" = "Apps to Close";
+"field.bundleIdentifier" = "Bundle Identifier";
 "field.destination" = "Destination";
 "placeholder.productName" = "Product name";
 "placeholder.productFileName" = "Product-1.0.pkg";
 "placeholder.componentName" = "Application";
+"placeholder.bundleIdentifier" = "com.example.app";
 "picker.ownership" = "Ownership";
 "picker.minimumMacOS" = "Minimum macOS";
 "picker.page" = "Page";
@@ -150,6 +155,7 @@
 "toggle.required" = "Required";
 "toggle.selectedByDefault" = "Selected by default";
 "toggle.visibleInCustomize" = "Visible in customize list";
+"toggle.mustCloseApplications" = "Require listed apps to quit before installation";
 "page.welcome" = "Welcome";
 "page.readme" = "Read Me";
 "page.license" = "License";
@@ -303,6 +309,7 @@
 "help.component.ownership" = "Ownership: Recommended lets pkgbuild apply standard ownership; Preserve keeps ownership from source files.";
 "help.component.choice" = "Choice: controls whether the component is required, selected by default, and visible in Installer Customize.";
 "help.component.scripts" = "Preinstall and Postinstall: optional shell scripts executed by this component package.";
+"help.component.mustCloseApplications" = "Apps to Close: bundle identifiers of running apps that macOS Installer must quit before this component starts installing. Installer shows a native confirmation dialog.";
 "help.preview.page" = "Page: selects which Installer page to preview.";
 "help.preview.localization" = "Localization: shows the default resource or a localized .lproj variant.";
 "help.preview.appearance" = "Appearance: switches between light and dark background choices.";
@@ -311,6 +318,13 @@
 "help.payload.folderContents" = "Folder Contents: copies the current contents of a source folder into a fixed destination folder at build time.";
 "help.payload.emptyDirectory" = "Empty Directory: creates a destination folder without requiring a source path.";
 "help.payload.destination" = "Destination: absolute install path where this payload entry will be staged.";
+"mustClose.enabled" = "Enabled";
+"mustClose.empty" = "No apps are listed yet. Add a bundle identifier or choose an .app.";
+"mustClose.add" = "Add Bundle ID";
+"mustClose.add.help" = "Add an application bundle identifier manually";
+"mustClose.chooseApp" = "Choose App";
+"mustClose.chooseApp.help" = "Choose an .app and read its bundle identifier";
+"mustClose.remove.help" = "Remove this application requirement";
 "installerLanguage.en" = "English";
 "installerLanguage.uk" = "Ukrainian";
 "installerLanguage.es" = "Spanish";

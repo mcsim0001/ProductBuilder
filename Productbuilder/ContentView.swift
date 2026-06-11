@@ -9,16 +9,134 @@ private enum ConfigurationTab: Hashable {
 }
 
 enum ProductbuilderLayout {
-    static let sidebarMinWidth: CGFloat = 280
-    static let sidebarIdealWidth: CGFloat = 320
+    static let sidebarMinWidth: CGFloat = 220
+    static let sidebarIdealWidth: CGFloat = 240
     static let sidebarMaxWidth: CGFloat = 420
-    static let configurationMinWidth: CGFloat = 620
-    static let configurationIdealWidth: CGFloat = 760
-    static let logMinWidth: CGFloat = 360
-    static let logIdealWidth: CGFloat = 420
+    static let configurationMinWidth: CGFloat = 600
+    static let configurationIdealWidth: CGFloat = 740
+    static let logMinWidth: CGFloat = 260
+    static let logIdealWidth: CGFloat = 320
     static let logMaxWidth: CGFloat = 560
-    static let windowMinWidth: CGFloat = sidebarMinWidth + configurationMinWidth + logMinWidth
-    static let windowMinHeight: CGFloat = 720
+    static let windowMinWidth: CGFloat = sidebarMinWidth + configurationMinWidth + logMinWidth + 40
+    static let windowMinHeight: CGFloat = 600
+}
+
+private struct SidebarIntrinsicWidthPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+private struct LogIntrinsicWidthPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+private struct SidebarIntrinsicWidthReporter: ViewModifier {
+    func body(content: Content) -> some View {
+        content.background {
+            GeometryReader { proxy in
+                Color.clear.preference(key: SidebarIntrinsicWidthPreferenceKey.self, value: proxy.size.width)
+            }
+        }
+    }
+}
+
+private struct LogIntrinsicWidthReporter: ViewModifier {
+    func body(content: Content) -> some View {
+        content.background {
+            GeometryReader { proxy in
+                Color.clear.preference(key: LogIntrinsicWidthPreferenceKey.self, value: proxy.size.width)
+            }
+        }
+    }
+}
+
+private extension View {
+    func reportsSidebarIntrinsicWidth() -> some View {
+        modifier(SidebarIntrinsicWidthReporter())
+    }
+
+    func reportsLogIntrinsicWidth() -> some View {
+        modifier(LogIntrinsicWidthReporter())
+    }
+}
+
+private struct SidebarIntrinsicWidthProbe: View {
+    let title: String
+    let helpTitle: String
+    let addTitle: String
+    let removeTitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Text(title)
+                    .font(.headline)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+
+                Button {} label: {
+                    Label(helpTitle, systemImage: "questionmark.circle")
+                        .labelStyle(.iconOnly)
+                }
+                .buttonStyle(.plain)
+                .fixedSize()
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
+            .padding(.bottom, 6)
+            .reportsSidebarIntrinsicWidth()
+
+            HStack {
+                Button {} label: {
+                    Label(addTitle, systemImage: "plus")
+                }
+                .fixedSize()
+
+                Button {} label: {
+                    Label(removeTitle, systemImage: "minus")
+                }
+                .fixedSize()
+            }
+            .padding(10)
+            .reportsSidebarIntrinsicWidth()
+        }
+        .fixedSize()
+        .opacity(0)
+        .accessibilityHidden(true)
+        .allowsHitTesting(false)
+    }
+}
+
+private struct LogIntrinsicWidthProbe: View {
+    let title: String
+    let clearTitle: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Label(title, systemImage: "terminal")
+                .font(.headline)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+
+            Button {} label: {
+                Label(clearTitle, systemImage: "trash")
+            }
+            .fixedSize()
+        }
+        .padding(12)
+        .fixedSize()
+        .opacity(0)
+        .accessibilityHidden(true)
+        .allowsHitTesting(false)
+        .reportsLogIntrinsicWidth()
+    }
 }
 
 struct ContentView: View {
@@ -27,10 +145,35 @@ struct ContentView: View {
     @State private var signingIdentities: [String] = []
     @State private var showsComponentsHelp = false
     @State private var selectedConfigurationTab: ConfigurationTab = .component
+    @State private var measuredSidebarMinWidth = ProductbuilderLayout.sidebarMinWidth
+    @State private var measuredLogMinWidth = ProductbuilderLayout.logMinWidth
+    @State private var isSidebarVisible = true
+
+    private var sidebarMinWidth: CGFloat {
+        ceil(max(ProductbuilderLayout.sidebarMinWidth, measuredSidebarMinWidth))
+    }
+
+    private var sidebarIdealWidth: CGFloat {
+        min(ProductbuilderLayout.sidebarMaxWidth, max(ProductbuilderLayout.sidebarIdealWidth, sidebarMinWidth + 12))
+    }
+
+    private var windowMinWidth: CGFloat {
+        (isSidebarVisible ? sidebarMinWidth : 0) + ProductbuilderLayout.configurationMinWidth + logMinWidth
+    }
+
+    private var logMinWidth: CGFloat {
+        ceil(max(ProductbuilderLayout.logMinWidth, measuredLogMinWidth))
+    }
+
+    private var logIdealWidth: CGFloat {
+        min(ProductbuilderLayout.logMaxWidth, max(ProductbuilderLayout.logIdealWidth, logMinWidth + 12))
+    }
 
     var body: some View {
         HSplitView {
-            componentSidebar
+            if isSidebarVisible {
+                componentSidebar
+            }
 
             configurationView
                 .frame(
@@ -42,14 +185,26 @@ struct ContentView: View {
 
             logView
                 .frame(
-                    minWidth: ProductbuilderLayout.logMinWidth,
-                    idealWidth: ProductbuilderLayout.logIdealWidth,
+                    minWidth: logMinWidth,
+                    idealWidth: logIdealWidth,
                     maxWidth: ProductbuilderLayout.logMaxWidth,
                     maxHeight: .infinity
                 )
         }
-        .frame(minWidth: ProductbuilderLayout.windowMinWidth, minHeight: ProductbuilderLayout.windowMinHeight)
+        .frame(minWidth: windowMinWidth, minHeight: ProductbuilderLayout.windowMinHeight)
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        isSidebarVisible.toggle()
+                    }
+                } label: {
+                    Label(sidebarToggleTitle, systemImage: "sidebar.left")
+                        .labelStyle(.iconOnly)
+                }
+                .help(sidebarToggleTitle)
+            }
+
             ToolbarItemGroup {
                 Button {
                     ProjectDocument.open(into: model)
@@ -87,6 +242,14 @@ struct ContentView: View {
         .onAppear {
             model.selectFirstComponentIfNeeded()
             refreshSigningIdentities()
+        }
+    }
+
+    private var sidebarToggleTitle: String {
+        if isSidebarVisible {
+            localization.t("toolbar.hideSidebar", fallback: "Hide components sidebar")
+        } else {
+            localization.t("toolbar.showSidebar", fallback: "Show components sidebar")
         }
     }
 
@@ -191,12 +354,27 @@ struct ContentView: View {
             .padding(10)
         }
         .frame(
-            minWidth: ProductbuilderLayout.sidebarMinWidth,
-            idealWidth: ProductbuilderLayout.sidebarIdealWidth,
+            minWidth: sidebarMinWidth,
+            idealWidth: sidebarIdealWidth,
             maxWidth: ProductbuilderLayout.sidebarMaxWidth,
             maxHeight: .infinity,
             alignment: .leading
         )
+        .overlay(alignment: .topLeading) {
+            SidebarIntrinsicWidthProbe(
+                title: localization.t("components.title"),
+                helpTitle: localization.t("components.help.label"),
+                addTitle: localization.t("button.add"),
+                removeTitle: localization.t("button.remove")
+            )
+        }
+        .onPreferenceChange(SidebarIntrinsicWidthPreferenceKey.self) { width in
+            guard width > 0 else { return }
+            let roundedWidth = ceil(width)
+            if abs(roundedWidth - measuredSidebarMinWidth) > 0.5 {
+                measuredSidebarMinWidth = roundedWidth
+            }
+        }
     }
 
     private var configurationView: some View {
@@ -587,6 +765,14 @@ struct ContentView: View {
                     Text(localization.t("field.postinstall"))
                     PathField(path: binding(\.postinstallScriptPath), mode: .file, optional: true)
                 }
+
+                GridRow {
+                    Text(localization.t("field.mustCloseApplications"))
+                    MustCloseApplicationsEditor(
+                        isEnabled: binding(\.mustCloseApplications),
+                        items: binding(\.mustCloseApplicationItems)
+                    )
+                }
             }
             .textFieldStyle(.roundedBorder)
             .padding(12)
@@ -605,7 +791,8 @@ struct ContentView: View {
                     localization.t("help.component.version"),
                     localization.t("help.component.ownership"),
                     localization.t("help.component.choice"),
-                    localization.t("help.component.scripts")
+                    localization.t("help.component.scripts"),
+                    localization.t("help.component.mustCloseApplications")
                 ]
             )
         }
@@ -726,6 +913,19 @@ struct ContentView: View {
                 }
             }
             .background(Color(nsColor: .textBackgroundColor))
+        }
+        .overlay(alignment: .topLeading) {
+            LogIntrinsicWidthProbe(
+                title: localization.t("buildLog.title"),
+                clearTitle: localization.t("button.clear")
+            )
+        }
+        .onPreferenceChange(LogIntrinsicWidthPreferenceKey.self) { width in
+            guard width > 0 else { return }
+            let roundedWidth = ceil(width)
+            if abs(roundedWidth - measuredLogMinWidth) > 0.5 {
+                measuredLogMinWidth = roundedWidth
+            }
         }
     }
 
@@ -1951,6 +2151,109 @@ private struct PayloadEntriesEditor: View {
                 }
             }
         }
+    }
+}
+
+private struct MustCloseApplicationsEditor: View {
+    @EnvironmentObject private var localization: AppLocalization
+    @Binding var isEnabled: Bool
+    @Binding var items: [MustCloseApplicationItem]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(localization.t("toggle.mustCloseApplications"), isOn: $isEnabled)
+
+            if isEnabled {
+                if items.isEmpty {
+                    Text(localization.t("mustClose.empty"))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(items.indices, id: \.self) { index in
+                            MustCloseApplicationRow(item: $items[index]) {
+                                items.remove(at: index)
+                            }
+                        }
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    Button {
+                        items.append(MustCloseApplicationItem())
+                    } label: {
+                        Label(localization.t("mustClose.add"), systemImage: "plus")
+                    }
+                    .help(localization.t("mustClose.add.help"))
+
+                    Button {
+                        chooseApplications()
+                    } label: {
+                        Label(localization.t("mustClose.chooseApp"), systemImage: "app.dashed")
+                    }
+                    .help(localization.t("mustClose.chooseApp.help"))
+
+                    Spacer()
+                }
+            }
+        }
+    }
+
+    private func chooseApplications() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowedFileTypes = ["app"]
+        panel.title = localization.t("mustClose.chooseApp")
+
+        guard panel.runModal() == .OK else { return }
+
+        for url in panel.urls {
+            guard let bundleIdentifier = Bundle(url: url)?.bundleIdentifier,
+                  !bundleIdentifier.trimmed.isEmpty else {
+                continue
+            }
+            if !items.contains(where: { $0.bundleIdentifier == bundleIdentifier }) {
+                items.append(MustCloseApplicationItem(bundleIdentifier: bundleIdentifier))
+            }
+        }
+    }
+}
+
+private struct MustCloseApplicationRow: View {
+    @EnvironmentObject private var localization: AppLocalization
+    @Binding var item: MustCloseApplicationItem
+    let remove: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Toggle(localization.t("mustClose.enabled"), isOn: $item.isEnabled)
+                    .labelsHidden()
+
+                TextField(localization.t("placeholder.bundleIdentifier"), text: $item.bundleIdentifier)
+
+                Button(role: .destructive) {
+                    remove()
+                } label: {
+                    Label(localization.t("button.remove"), systemImage: "minus.circle")
+                        .labelStyle(.iconOnly)
+                }
+                .help(localization.t("mustClose.remove.help"))
+            }
+
+            if item.isEnabled,
+               let issue = ProjectInputValidator.validatePackageIdentifier(item.bundleIdentifier) {
+                Text(issue.localizedDescription(fieldName: localization.t("field.bundleIdentifier"), localization: localization))
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(8)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }
 

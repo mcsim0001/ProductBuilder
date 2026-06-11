@@ -76,6 +76,8 @@
 "language.contextTitle" = "Мова інтерфейсу";
 "toolbar.open" = "Відкрити";
 "toolbar.open.help" = "Відкрити проєкт Productbuilder";
+"toolbar.hideSidebar" = "Сховати панель компонентів";
+"toolbar.showSidebar" = "Показати панель компонентів";
 "toolbar.import" = "Імпортувати";
 "toolbar.import.help" = "Імпортувати проєкт Packages .pkgproj";
 "toolbar.save" = "Зберегти";
@@ -129,10 +131,13 @@
 "field.choice" = "Пункт вибору";
 "field.preinstall" = "Preinstall-скрипт";
 "field.postinstall" = "Postinstall-скрипт";
+"field.mustCloseApplications" = "Додатки для завершення";
+"field.bundleIdentifier" = "Bundle identifier";
 "field.destination" = "Шлях призначення";
 "placeholder.productName" = "Назва продукту";
 "placeholder.productFileName" = "Product-1.0.pkg";
 "placeholder.componentName" = "Застосунок";
+"placeholder.bundleIdentifier" = "com.example.app";
 "picker.ownership" = "Власність файлів";
 "picker.minimumMacOS" = "Мінімальна версія macOS";
 "picker.page" = "Сторінка";
@@ -150,6 +155,7 @@
 "toggle.required" = "Обовʼязковий";
 "toggle.selectedByDefault" = "Вибраний за замовчуванням";
 "toggle.visibleInCustomize" = "Показувати у списку «Налаштувати»";
+"toggle.mustCloseApplications" = "Вимагати завершення вказаних додатків перед встановленням";
 "page.welcome" = "Вітання";
 "page.readme" = "Read Me";
 "page.license" = "Ліцензія";
@@ -303,6 +309,7 @@
 "help.component.ownership" = "Власність файлів: «Рекомендовано» дозволяє pkgbuild застосувати рекомендованих власника і групу; «Зберегти з джерела» бере їх із вихідних файлів.";
 "help.component.choice" = "Пункт вибору: визначає, чи компонент обовʼязковий, вибраний за замовчуванням і видимий у списку «Налаштувати».";
 "help.component.scripts" = "Preinstall- і Postinstall-скрипти: необовʼязкові shell-скрипти, які виконує пакет цього компонента.";
+"help.component.mustCloseApplications" = "Додатки для завершення: bundle identifiers запущених додатків, які macOS Installer має завершити перед встановленням цього компонента. Installer показує нативне вікно підтвердження.";
 "help.preview.page" = "Сторінка: вибирає сторінку інсталятора для попереднього перегляду.";
 "help.preview.localization" = "Мова: показує основний ресурс або локалізований варіант із папки .lproj.";
 "help.preview.appearance" = "Вигляд: перемикає світлий і темний варіанти оформлення.";
@@ -311,6 +318,13 @@
 "help.payload.folderContents" = "Вміст папки: копіює поточний вміст вихідної папки у фіксовану папку призначення під час збірки.";
 "help.payload.emptyDirectory" = "Порожня папка: створює папку призначення без вихідного шляху.";
 "help.payload.destination" = "Шлях призначення: абсолютний шлях, куди буде підготовлено цей запис вмісту пакета.";
+"mustClose.enabled" = "Увімкнено";
+"mustClose.empty" = "Список додатків порожній. Додайте bundle identifier або виберіть .app.";
+"mustClose.add" = "Додати bundle id";
+"mustClose.add.help" = "Додати bundle identifier додатка вручну";
+"mustClose.chooseApp" = "Вибрати додаток";
+"mustClose.chooseApp.help" = "Вибрати .app і взяти його bundle identifier";
+"mustClose.remove.help" = "Видалити цю вимогу до додатка";
 "installerLanguage.en" = "Англійська";
 "installerLanguage.uk" = "Українська";
 "installerLanguage.es" = "Іспанська";
