@@ -4,6 +4,8 @@ import AppKit
 #endif
 
 struct PackageBuildService {
+    private static let defaultHostArchitectures = "arm64,x86_64"
+
     struct BuildResult {
         let outputURL: URL
         let uninstallerURL: URL?
@@ -59,6 +61,10 @@ struct PackageBuildService {
         try await runStage("Create Distribution XML", log: log) {
             try makeDistribution(project: project, components: builtComponents, resources: resourceManifest)
                 .write(to: distributionURL, atomically: true, encoding: .utf8)
+        }
+
+        try await runStage("Clear quarantine attributes", log: log) {
+            try clearQuarantineAttributes(at: temporaryRoot)
         }
 
         let outputDirectory = URL(fileURLWithPath: project.outputDirectory, isDirectory: true)
@@ -371,6 +377,7 @@ struct PackageBuildService {
             try fileManager.removeItem(at: destinationURL)
         }
         try fileManager.copyItem(at: sourceURL, to: destinationURL)
+        try clearQuarantineAttributes(at: destinationURL)
     }
 
     private func makeScriptsDirectory(for component: PackageComponent, directory scriptsDirectory: URL) throws -> URL? {
@@ -394,6 +401,7 @@ struct PackageBuildService {
                 try fileManager.removeItem(at: destinationURL)
             }
             try fileManager.copyItem(at: sourceURL, to: destinationURL)
+            try clearQuarantineAttributes(at: destinationURL)
             try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: destinationURL.path)
         }
 
@@ -561,6 +569,22 @@ struct PackageBuildService {
             try fileManager.removeItem(at: destinationURL)
         }
         try fileManager.copyItem(at: sourceURL, to: destinationURL)
+        try clearQuarantineAttributes(at: destinationURL)
+    }
+
+    private func clearQuarantineAttributes(at url: URL) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
+        process.arguments = ["-rd", "com.apple.quarantine", url.path]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+
+        try process.run()
+        process.waitUntilExit()
+
+        guard process.terminationStatus == 0 else {
+            throw BuildError.commandFailed("/usr/bin/xattr", process.terminationStatus)
+        }
     }
 
     private func makeDistribution(
@@ -656,7 +680,7 @@ struct PackageBuildService {
         <?xml version="1.0" encoding="utf-8"?>
         <installer-gui-script minSpecVersion="1">
             <title>\(project.productName.xmlEscaped)</title>
-            <options customize="\(project.allowCustomize ? "allow" : "never")" require-scripts="false"/>
+            <options hostArchitectures="\(Self.defaultHostArchitectures)" customize="\(project.allowCustomize ? "allow" : "never")" require-scripts="false"/>
             \(domains)
         \(backgroundTags)
         \(screenTags)
