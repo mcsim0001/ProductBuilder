@@ -83,17 +83,26 @@ struct PackageBuildService {
             arguments += ["--resources", resourcesURL.path]
         }
 
-        if !project.signingIdentity.trimmed.isEmpty {
-            arguments += ["--sign", project.signingIdentity.trimmed]
-        }
-
         arguments.append(outputURL.path)
         let productStage = project.signingIdentity.trimmed.isEmpty
             ? "Create product package"
             : "Create and sign product package"
         try await runStage(productStage, log: log) {
             try await run("/usr/bin/productbuild", arguments: arguments, log: log)
+            try await rewriteProductDistributionInPackagesStyle(
+                packageURL: outputURL,
+                workspaceDirectory: temporaryRoot,
+                log: log
+            )
             await applyPackageIconIfNeeded(project: project, outputURL: outputURL, log: log)
+            if !project.signingIdentity.trimmed.isEmpty {
+                try await signProductPackage(
+                    at: outputURL,
+                    identity: project.signingIdentity.trimmed,
+                    workspaceDirectory: temporaryRoot,
+                    log: log
+                )
+            }
         }
         if project.signingIdentity.trimmed.isEmpty {
             await logSkip("Sign product package: no signing identity selected", log: log)
@@ -341,9 +350,177 @@ struct PackageBuildService {
         arguments.append(componentPackageURL.path)
 
         try await run("/usr/bin/pkgbuild", arguments: arguments, log: log)
+        try await rewriteComponentPackageInfoInPackagesStyle(
+            component: component,
+            packageURL: componentPackageURL,
+            payloadRoot: componentStage,
+            workspaceDirectory: stageDirectory,
+            log: log
+        )
         await log("Built component package: \(componentPackageURL.lastPathComponent)")
 
         return BuiltComponent(component: component, packageURL: componentPackageURL, installedPayloadPaths: installedPayloadPaths)
+    }
+
+    private func rewriteComponentPackageInfoInPackagesStyle(
+        component: PackageComponent,
+        packageURL: URL,
+        payloadRoot: URL,
+        workspaceDirectory: URL,
+        log: @escaping @MainActor (String) -> Void
+    ) async throws {
+        let fileManager = FileManager.default
+        let expandedRoot = workspaceDirectory
+            .appendingPathComponent("ExpandedComponentPackages", isDirectory: true)
+            .appendingPathComponent(component.id.uuidString, isDirectory: true)
+
+        if fileManager.fileExists(atPath: expandedRoot.path) {
+            try fileManager.removeItem(at: expandedRoot)
+        }
+        try fileManager.createDirectory(at: expandedRoot.deletingLastPathComponent(), withIntermediateDirectories: true)
+
+        try await run(
+            "/usr/sbin/pkgutil",
+            arguments: ["--expand-full", packageURL.path, expandedRoot.path],
+            log: log
+        )
+
+        let packageInfoURL = expandedRoot.appendingPathComponent("PackageInfo")
+        let existingPackageInfo = try ExistingPackageInfo(contentsOf: packageInfoURL)
+        let bundleTree = try collectBundleTree(in: payloadRoot)
+        let packageInfo = makePackagesStylePackageInfo(
+            component: component,
+            existingPackageInfo: existingPackageInfo,
+            bundleTree: bundleTree
+        )
+        try packageInfo.write(to: packageInfoURL, atomically: true, encoding: .utf8)
+
+        if fileManager.fileExists(atPath: packageURL.path) {
+            try fileManager.removeItem(at: packageURL)
+        }
+
+        try await run(
+            "/usr/sbin/pkgutil",
+            arguments: ["--flatten", expandedRoot.path, packageURL.path],
+            log: log
+        )
+
+        if bundleTree.isEmpty {
+            await log("Rewrote PackageInfo in Packages style: no bundles in \(component.name)")
+        } else {
+            await log("Rewrote PackageInfo in Packages style: \(bundleTree.flattenedCount) bundle(s) in \(component.name)")
+        }
+    }
+
+    private func rewriteProductDistributionInPackagesStyle(
+        packageURL: URL,
+        workspaceDirectory: URL,
+        log: @escaping @MainActor (String) -> Void
+    ) async throws {
+        let fileManager = FileManager.default
+        let expandedRoot = workspaceDirectory.appendingPathComponent("ExpandedProduct", isDirectory: true)
+
+        if fileManager.fileExists(atPath: expandedRoot.path) {
+            try fileManager.removeItem(at: expandedRoot)
+        }
+
+        try await run(
+            "/usr/sbin/pkgutil",
+            arguments: ["--expand-full", packageURL.path, expandedRoot.path],
+            log: log
+        )
+
+        let distributionURL = expandedRoot.appendingPathComponent("Distribution")
+        let document = try XMLDocument(data: Data(contentsOf: distributionURL), options: [])
+        guard let root = document.rootElement() else {
+            throw BuildError.validation("Could not read product Distribution metadata.")
+        }
+
+        var removedMetadataElementCount = 0
+        var removedPackageRefCount = 0
+
+        for packageRef in root.elements(forName: "pkg-ref") {
+            let metadataElements = packageRef.children?
+                .compactMap { $0 as? XMLElement }
+                .filter(isProductbuildGeneratedMetadataElement) ?? []
+
+            for metadataElement in metadataElements {
+                metadataElement.detach()
+                removedMetadataElementCount += 1
+            }
+
+            if shouldRemoveEmptyGeneratedPackageRef(packageRef) {
+                packageRef.detach()
+                removedPackageRefCount += 1
+            }
+        }
+
+        guard removedMetadataElementCount > 0 || removedPackageRefCount > 0 else { return }
+
+        let distributionData = document.xmlData(options: [.nodePrettyPrint])
+        try distributionData.write(to: distributionURL, options: .atomic)
+
+        if fileManager.fileExists(atPath: packageURL.path) {
+            try fileManager.removeItem(at: packageURL)
+        }
+
+        try await run(
+            "/usr/sbin/pkgutil",
+            arguments: ["--flatten", expandedRoot.path, packageURL.path],
+            log: log
+        )
+
+        await log(
+            "Rewrote Distribution in Packages style: removed \(removedMetadataElementCount) generated metadata element(s), \(removedPackageRefCount) empty package reference(s)"
+        )
+    }
+
+    private func isProductbuildGeneratedMetadataElement(_ element: XMLElement) -> Bool {
+        let metadataElementNames: Set<String> = [
+            "bundle-version",
+            "upgrade-bundle",
+            "strict-identifier",
+            "relocate"
+        ]
+        guard let name = element.name else { return false }
+        return metadataElementNames.contains(name)
+    }
+
+    private func shouldRemoveEmptyGeneratedPackageRef(_ element: XMLElement) -> Bool {
+        let childElements = element.children?.compactMap { $0 as? XMLElement } ?? []
+        guard childElements.isEmpty else { return false }
+
+        let directText = element.children?
+            .compactMap { child -> String? in
+                guard child.kind == .text else { return nil }
+                return child.stringValue
+            }
+            .joined()
+            .trimmed ?? ""
+
+        return directText.isEmpty
+    }
+
+    private func signProductPackage(
+        at packageURL: URL,
+        identity: String,
+        workspaceDirectory: URL,
+        log: @escaping @MainActor (String) -> Void
+    ) async throws {
+        let fileManager = FileManager.default
+        let signedURL = workspaceDirectory.appendingPathComponent("Signed-\(packageURL.lastPathComponent)")
+        if fileManager.fileExists(atPath: signedURL.path) {
+            try fileManager.removeItem(at: signedURL)
+        }
+
+        try await run(
+            "/usr/bin/productsign",
+            arguments: ["--sign", identity, packageURL.path, signedURL.path],
+            log: log
+        )
+
+        try fileManager.removeItem(at: packageURL)
+        try fileManager.moveItem(at: signedURL, to: packageURL)
     }
 
     private func stage(_ payload: PackagePayloadEntry, in componentStage: URL) throws -> [String] {
@@ -738,6 +915,177 @@ struct PackageBuildService {
         }
     }
 
+    private func makePackagesStylePackageInfo(
+        component: PackageComponent,
+        existingPackageInfo: ExistingPackageInfo,
+        bundleTree: [PackageBundleInfo]
+    ) -> String {
+        let scripts = packageInfoScripts(for: component)
+        let bundleVersion = packageInfoBundleVersion(for: bundleTree)
+
+        return """
+        <pkg-info format-version="2" identifier="\(component.packageIdentifier.trimmed.xmlEscaped)" version="\(component.version.trimmed.xmlEscaped)" relocatable="false" overwrite-permissions="false" followSymLinks="false" install-location="/" auth="root">
+        <payload installKBytes="\(existingPackageInfo.installKBytes.xmlEscaped)" numberOfFiles="\(existingPackageInfo.numberOfFiles.xmlEscaped)"/>
+        \(scripts)\(bundleVersion)</pkg-info>
+        """
+    }
+
+    private func packageInfoScripts(for component: PackageComponent) -> String {
+        let hasPreinstall = !component.preinstallScriptPath.trimmed.isEmpty
+        let hasPostinstall = !component.postinstallScriptPath.trimmed.isEmpty
+        guard hasPreinstall || hasPostinstall else { return "" }
+
+        var lines = ["<scripts>"]
+        if hasPreinstall {
+            lines.append("    <preinstall file=\"./preinstall\"/>")
+        }
+        if hasPostinstall {
+            lines.append("    <postinstall file=\"./postinstall\"/>")
+        }
+        lines.append("</scripts>")
+        return "\(lines.joined(separator: "\n"))\n"
+    }
+
+    private func packageInfoBundleVersion(for bundleTree: [PackageBundleInfo]) -> String {
+        guard !bundleTree.isEmpty else { return "" }
+
+        let bundles = bundleTree
+            .map { packageInfoBundleXML(for: $0, parentPath: nil, indentation: "    ") }
+            .joined(separator: "\n")
+
+        return """
+        <bundle-version>
+        \(bundles)
+        </bundle-version>
+        """
+        + "\n"
+    }
+
+    private func packageInfoBundleXML(
+        for bundle: PackageBundleInfo,
+        parentPath: String?,
+        indentation: String
+    ) -> String {
+        let path = packageInfoBundlePath(for: bundle.relativePath, parentPath: parentPath)
+        var attributes = [
+            #"path="\#(path.xmlEscaped)""#
+        ]
+
+        if let shortVersion = bundle.shortVersion, !shortVersion.isEmpty {
+            attributes.append(#"CFBundleShortVersionString="\#(shortVersion.xmlEscaped)""#)
+        }
+        if let version = bundle.version, !version.isEmpty {
+            attributes.append(#"CFBundleVersion="\#(version.xmlEscaped)""#)
+        }
+        attributes.append(#"id="\#(bundle.identifier.xmlEscaped)""#)
+        attributes.append(#"CFBundleIdentifier="\#(bundle.identifier.xmlEscaped)""#)
+
+        let openingTag = "\(indentation)<bundle \(attributes.joined(separator: " "))"
+        guard !bundle.children.isEmpty else {
+            return "\(openingTag)/>"
+        }
+
+        let childXML = bundle.children
+            .map { packageInfoBundleXML(for: $0, parentPath: bundle.relativePath, indentation: "\(indentation)    ") }
+            .joined(separator: "\n")
+        return """
+        \(openingTag)>
+        \(childXML)
+        \(indentation)</bundle>
+        """
+    }
+
+    private func packageInfoBundlePath(for relativePath: String, parentPath: String?) -> String {
+        guard let parentPath else {
+            return "./\(relativePath)"
+        }
+
+        if relativePath.hasPrefix("\(parentPath)/") {
+            let childPath = relativePath.dropFirst(parentPath.count)
+            return ".\(childPath)"
+        }
+
+        return "./\(relativePath)"
+    }
+
+    private func collectBundleTree(in payloadRoot: URL) throws -> [PackageBundleInfo] {
+        let fileManager = FileManager.default
+        guard let enumerator = fileManager.enumerator(
+            at: payloadRoot,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [],
+            errorHandler: nil
+        ) else {
+            return []
+        }
+
+        var flatBundles: [FlatPackageBundleInfo] = []
+        for case let url as URL in enumerator {
+            let resourceValues = try url.resourceValues(forKeys: [.isDirectoryKey])
+            guard resourceValues.isDirectory == true else { continue }
+
+            let infoURL = url.appendingPathComponent("Contents/Info.plist")
+            guard fileManager.fileExists(atPath: infoURL.path) else { continue }
+            guard let plist = try propertyListDictionary(at: infoURL) else { continue }
+            guard let identifier = plist["CFBundleIdentifier"] as? String, !identifier.trimmed.isEmpty else { continue }
+
+            flatBundles.append(FlatPackageBundleInfo(
+                relativePath: relativePath(from: payloadRoot, to: url),
+                identifier: identifier,
+                shortVersion: plist["CFBundleShortVersionString"] as? String,
+                version: plist["CFBundleVersion"] as? String
+            ))
+        }
+
+        let sortedBundles = flatBundles.sorted { lhs, rhs in
+            if lhs.relativePath.pathComponentCount == rhs.relativePath.pathComponentCount {
+                return lhs.relativePath.localizedStandardCompare(rhs.relativePath) == .orderedAscending
+            }
+            return lhs.relativePath.pathComponentCount < rhs.relativePath.pathComponentCount
+        }
+
+        func nearestParentPath(for bundle: FlatPackageBundleInfo) -> String? {
+            sortedBundles
+                .filter { candidate in
+                    candidate.relativePath != bundle.relativePath
+                        && bundle.relativePath.hasPrefix("\(candidate.relativePath)/")
+                }
+                .max { lhs, rhs in
+                    lhs.relativePath.count < rhs.relativePath.count
+                }?
+                .relativePath
+        }
+
+        func buildChildren(of parentPath: String?) -> [PackageBundleInfo] {
+            sortedBundles
+                .filter { nearestParentPath(for: $0) == parentPath }
+                .map { bundle in
+                    PackageBundleInfo(
+                        relativePath: bundle.relativePath,
+                        identifier: bundle.identifier,
+                        shortVersion: bundle.shortVersion,
+                        version: bundle.version,
+                        children: buildChildren(of: bundle.relativePath)
+                    )
+                }
+        }
+
+        return buildChildren(of: nil)
+    }
+
+    private func propertyListDictionary(at url: URL) throws -> [String: Any]? {
+        let data = try Data(contentsOf: url)
+        let object = try PropertyListSerialization.propertyList(from: data, options: [], format: nil)
+        return object as? [String: Any]
+    }
+
+    private func relativePath(from root: URL, to url: URL) -> String {
+        let rootPath = root.standardizedFileURL.path
+        let path = url.standardizedFileURL.path
+        guard path.hasPrefix("\(rootPath)/") else { return url.lastPathComponent }
+        return String(path.dropFirst(rootPath.count + 1))
+    }
+
     private func applyPackageIconIfNeeded(
         project: PackageProject,
         outputURL: URL,
@@ -920,6 +1268,37 @@ private struct ResourceManifest {
     var conclusionFile: String?
 }
 
+private struct ExistingPackageInfo {
+    let installKBytes: String
+    let numberOfFiles: String
+
+    init(contentsOf packageInfoURL: URL) throws {
+        let data = try Data(contentsOf: packageInfoURL)
+        let document = try XMLDocument(data: data, options: [])
+        guard let payload = document.rootElement()?.elements(forName: "payload").first else {
+            throw BuildError.validation("Could not read payload metadata from PackageInfo.")
+        }
+
+        installKBytes = payload.attribute(forName: "installKBytes")?.stringValue ?? "0"
+        numberOfFiles = payload.attribute(forName: "numberOfFiles")?.stringValue ?? "0"
+    }
+}
+
+private struct PackageBundleInfo {
+    let relativePath: String
+    let identifier: String
+    let shortVersion: String?
+    let version: String?
+    let children: [PackageBundleInfo]
+}
+
+private struct FlatPackageBundleInfo {
+    let relativePath: String
+    let identifier: String
+    let shortVersion: String?
+    let version: String?
+}
+
 enum BuildError: LocalizedError {
     case validation(String)
     case commandFailed(String, Int32)
@@ -931,6 +1310,12 @@ enum BuildError: LocalizedError {
         case .commandFailed(let command, let status):
             return "\(command) failed with exit code \(status)."
         }
+    }
+}
+
+private extension Array where Element == PackageBundleInfo {
+    var flattenedCount: Int {
+        reduce(0) { $0 + 1 + $1.children.flattenedCount }
     }
 }
 
@@ -958,6 +1343,10 @@ private extension String {
     var normalizedAbsolutePath: String {
         let pieces = split(separator: "/").map(String.init)
         return pieces.isEmpty ? "/" : "/\(pieces.joined(separator: "/"))"
+    }
+
+    var pathComponentCount: Int {
+        split(separator: "/").count
     }
 
     func appendingPathComponent(_ component: String) -> String {
