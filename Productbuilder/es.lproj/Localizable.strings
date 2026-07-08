@@ -257,6 +257,12 @@
 "payload.add.help" = "Añadir entrada de contenido";
 "payload.remove.help" = "Eliminar entrada de contenido";
 "payload.empty" = "No hay entradas de contenido. Añade un archivo, contenido de carpeta o una carpeta vacía.";
+"payload.permissions.enabled" = "Definir propietario y permisos personalizados";
+"payload.permissions.owner" = "Propietario";
+"payload.permissions.group" = "Grupo";
+"payload.permissions.bundle" = "Bundle";
+"payload.permissions.directories" = "Carpetas";
+"payload.permissions.files" = "Archivos";
 "localization.title" = "Localizaciones";
 "localization.add" = "Añadir localización";
 "localization.add.help" = "Añadir localización";
@@ -318,6 +324,10 @@
 "help.payload.folderContents" = "Contenido de carpeta: copia el contenido actual de una carpeta de origen a una carpeta de destino fija durante la compilación.";
 "help.payload.emptyDirectory" = "Carpeta vacía: crea una carpeta de destino sin requerir una ruta de origen.";
 "help.payload.destination" = "Destino: absolute install path where this payload entry will be staged.";
+"help.payload.permissions" = "Permisos: actívalos cuando una entrada de contenido necesite propietario, grupo y modos POSIX explícitos escritos en Bom/Payload como en Packages.";
+"help.payload.permissions.principals" = "Propietario/Grupo: usa root para elementos del instalador; admin para carpetas de soporte de la app modificables por herramientas de administración; wheel para rutas de sistema comunes; staff para recursos compartidos de usuario.";
+"help.payload.permissions.modes" = "Modos: 755 permite leer/atravesar y ejecutar; 775 también permite escribir al grupo; 644 es para archivos normales de solo lectura.";
+"help.payload.permissions.bundle" = "Bundles: para entradas .app/.systemextension, el modo Bundle se aplica solo a la raíz del bundle; los archivos internos conservan permisos de origen y firmas de código.";
 "mustClose.enabled" = "Activado";
 "mustClose.empty" = "Aún no hay apps en la lista. Añade un identificador de bundle o elige una .app.";
 "mustClose.add" = "Añadir Bundle ID";

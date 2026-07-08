@@ -323,7 +323,6 @@ private struct ProductbuilderHelpView: View {
                             localization.t("help.component.name"),
                             localization.t("help.component.identifier"),
                             localization.t("help.component.version"),
-                            localization.t("help.component.ownership"),
                             localization.t("help.component.choice"),
                             localization.t("help.component.scripts")
                         ]
@@ -335,7 +334,11 @@ private struct ProductbuilderHelpView: View {
                             localization.t("help.payload.fileFolder"),
                             localization.t("help.payload.folderContents"),
                             localization.t("help.payload.emptyDirectory"),
-                            localization.t("help.payload.destination")
+                            localization.t("help.payload.destination"),
+                            localization.t("help.payload.permissions"),
+                            localization.t("help.payload.permissions.principals"),
+                            localization.t("help.payload.permissions.modes"),
+                            localization.t("help.payload.permissions.bundle")
                         ]
                     )
 

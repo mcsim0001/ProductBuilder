@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 #if canImport(AppKit)
 import AppKit
 #endif
@@ -285,6 +286,7 @@ struct PackageBuildService {
                         throw BuildError.validation("Folder Contents source must be a directory: \(payload.sourcePath)")
                     }
                 }
+                try validatePayloadPermissions(payload)
             }
             guard !component.packageIdentifier.trimmed.isEmpty else {
                 throw BuildError.validation("Component '\(component.name)' needs a package identifier.")
@@ -381,7 +383,7 @@ struct PackageBuildService {
 
         try await run(
             "/usr/sbin/pkgutil",
-            arguments: ["--expand-full", packageURL.path, expandedRoot.path],
+            arguments: ["--expand", packageURL.path, expandedRoot.path],
             log: log
         )
 
@@ -394,6 +396,21 @@ struct PackageBuildService {
             bundleTree: bundleTree
         )
         try packageInfo.write(to: packageInfoURL, atomically: true, encoding: .utf8)
+
+        let permissionRules = try payloadPermissionRules(for: component)
+        if !permissionRules.isEmpty {
+            let payloadChanges = try rewritePayloadPermissions(
+                in: expandedRoot.appendingPathComponent("Payload"),
+                rules: permissionRules,
+                workspaceDirectory: workspaceDirectory
+            )
+            let bomChanges = try rewriteBomPermissions(
+                in: expandedRoot.appendingPathComponent("Bom"),
+                rules: permissionRules,
+                workspaceDirectory: workspaceDirectory
+            )
+            await log("Applied custom payload permissions: \(payloadChanges) payload item(s), \(bomChanges) BOM item(s)")
+        }
 
         if fileManager.fileExists(atPath: packageURL.path) {
             try fileManager.removeItem(at: packageURL)
@@ -426,7 +443,7 @@ struct PackageBuildService {
 
         try await run(
             "/usr/sbin/pkgutil",
-            arguments: ["--expand-full", packageURL.path, expandedRoot.path],
+            arguments: ["--expand", packageURL.path, expandedRoot.path],
             log: log
         )
 
@@ -438,6 +455,7 @@ struct PackageBuildService {
 
         var removedMetadataElementCount = 0
         var removedPackageRefCount = 0
+        var normalizedMustClosePackageRefCount = 0
 
         for packageRef in root.elements(forName: "pkg-ref") {
             let metadataElements = packageRef.children?
@@ -449,13 +467,17 @@ struct PackageBuildService {
                 removedMetadataElementCount += 1
             }
 
+            if normalizeMustClosePackageRefIfNeeded(packageRef) {
+                normalizedMustClosePackageRefCount += 1
+            }
+
             if shouldRemoveEmptyGeneratedPackageRef(packageRef) {
                 packageRef.detach()
                 removedPackageRefCount += 1
             }
         }
 
-        guard removedMetadataElementCount > 0 || removedPackageRefCount > 0 else { return }
+        guard removedMetadataElementCount > 0 || removedPackageRefCount > 0 || normalizedMustClosePackageRefCount > 0 else { return }
 
         let distributionData = document.xmlData(options: [.nodePrettyPrint])
         try distributionData.write(to: distributionURL, options: .atomic)
@@ -471,7 +493,7 @@ struct PackageBuildService {
         )
 
         await log(
-            "Rewrote Distribution in Packages style: removed \(removedMetadataElementCount) generated metadata element(s), \(removedPackageRefCount) empty package reference(s)"
+            "Rewrote Distribution in Packages style: removed \(removedMetadataElementCount) generated metadata element(s), \(removedPackageRefCount) empty package reference(s), normalized \(normalizedMustClosePackageRefCount) must-close package reference(s)"
         )
     }
 
@@ -484,6 +506,30 @@ struct PackageBuildService {
         ]
         guard let name = element.name else { return false }
         return metadataElementNames.contains(name)
+    }
+
+    private func normalizeMustClosePackageRefIfNeeded(_ element: XMLElement) -> Bool {
+        let childElements = element.children?.compactMap { $0 as? XMLElement } ?? []
+        guard childElements.count == 1, childElements.first?.name == "must-close" else { return false }
+
+        let directText = element.children?
+            .compactMap { child -> String? in
+                guard child.kind == .text else { return nil }
+                return child.stringValue
+            }
+            .joined()
+            .trimmed ?? ""
+        guard directText.isEmpty else { return false }
+
+        let attributeNamesToRemove = (element.attributes ?? [])
+            .compactMap(\.name)
+            .filter { $0 != "id" }
+
+        for attributeName in attributeNamesToRemove {
+            element.removeAttribute(forName: attributeName)
+        }
+
+        return !attributeNamesToRemove.isEmpty
     }
 
     private func shouldRemoveEmptyGeneratedPackageRef(_ element: XMLElement) -> Bool {
@@ -530,7 +576,7 @@ struct PackageBuildService {
 
         switch payload.kind {
         case .emptyDirectory:
-            return []
+            return [payload.destinationPath.normalizedAbsolutePath]
 
         case .fileOrFolder:
             let sourceURL = URL(fileURLWithPath: payload.sourcePath)
@@ -555,6 +601,249 @@ struct PackageBuildService {
         }
         try fileManager.copyItem(at: sourceURL, to: destinationURL)
         try clearQuarantineAttributes(at: destinationURL)
+    }
+
+    private func validatePayloadPermissions(_ payload: PackagePayloadEntry) throws {
+        let permissions = payload.permissions
+        let payloadTitle = payload.title
+        guard permissions.isEnabled else { return }
+        _ = try userID(for: permissions.owner, fieldName: "Owner", payloadTitle: payloadTitle)
+        _ = try groupID(for: permissions.group, fieldName: "Group", payloadTitle: payloadTitle)
+        if payload.isBundlePayload {
+            _ = try octalPermissionMode(permissions.bundleMode, fieldName: "Bundle permissions", payloadTitle: payloadTitle)
+        } else {
+            _ = try octalPermissionMode(permissions.directoryMode, fieldName: "Directory permissions", payloadTitle: payloadTitle)
+            _ = try octalPermissionMode(permissions.fileMode, fieldName: "File permissions", payloadTitle: payloadTitle)
+        }
+    }
+
+    private func payloadPermissionRules(for component: PackageComponent) throws -> [PayloadPermissionRule] {
+        try component.effectivePayloadEntries.compactMap { payload in
+            guard payload.permissions.isEnabled else { return nil }
+
+            let permissions = payload.permissions
+            let directoryMode = payload.isBundlePayload
+                ? try octalPermissionMode(permissions.bundleMode, fieldName: "Bundle permissions", payloadTitle: payload.title)
+                : try octalPermissionMode(permissions.directoryMode, fieldName: "Directory permissions", payloadTitle: payload.title)
+            let fileMode = payload.isBundlePayload
+                ? directoryMode
+                : try octalPermissionMode(permissions.fileMode, fieldName: "File permissions", payloadTitle: payload.title)
+
+            return PayloadPermissionRule(
+                installPath: payloadPermissionRoot(for: payload),
+                ownerID: try userID(for: permissions.owner, fieldName: "Owner", payloadTitle: payload.title),
+                groupID: try groupID(for: permissions.group, fieldName: "Group", payloadTitle: payload.title),
+                directoryMode: directoryMode,
+                fileMode: fileMode,
+                recursive: payload.kind != .emptyDirectory && !payload.isBundlePayload
+            )
+        }
+        .sorted { $0.installPath.pathComponentCount > $1.installPath.pathComponentCount }
+    }
+
+    private func payloadPermissionRoot(for payload: PackagePayloadEntry) -> String {
+        let destination = payload.destinationPath.normalizedAbsolutePath
+        guard payload.kind == .fileOrFolder, !payload.sourcePath.trimmed.isEmpty else {
+            return destination
+        }
+        return destination.appendingPathComponent(URL(fileURLWithPath: payload.sourcePath).lastPathComponent)
+    }
+
+    private func userID(for value: String, fieldName: String, payloadTitle: String) throws -> Int {
+        let value = value.trimmed
+        guard !value.isEmpty else {
+            throw BuildError.validation("\(fieldName) is required for payload entry '\(payloadTitle)'.")
+        }
+        if let id = Int(value), id >= 0 {
+            return id
+        }
+        guard let passwd = getpwnam(value) else {
+            throw BuildError.validation("Unknown \(fieldName.lowercased()) '\(value)' for payload entry '\(payloadTitle)'.")
+        }
+        return Int(passwd.pointee.pw_uid)
+    }
+
+    private func groupID(for value: String, fieldName: String, payloadTitle: String) throws -> Int {
+        let value = value.trimmed
+        guard !value.isEmpty else {
+            throw BuildError.validation("\(fieldName) is required for payload entry '\(payloadTitle)'.")
+        }
+        if let id = Int(value), id >= 0 {
+            return id
+        }
+        guard let group = getgrnam(value) else {
+            throw BuildError.validation("Unknown \(fieldName.lowercased()) '\(value)' for payload entry '\(payloadTitle)'.")
+        }
+        return Int(group.pointee.gr_gid)
+    }
+
+    private func octalPermissionMode(_ value: String, fieldName: String, payloadTitle: String) throws -> Int {
+        let value = value.trimmed
+        guard (3...4).contains(value.count),
+              value.allSatisfy({ "01234567".contains($0) }),
+              let mode = Int(value, radix: 8),
+              mode <= 0o7777
+        else {
+            throw BuildError.validation("\(fieldName) for payload entry '\(payloadTitle)' must be an octal mode like 775 or 644.")
+        }
+        return mode
+    }
+
+    private func rewritePayloadPermissions(
+        in payloadURL: URL,
+        rules: [PayloadPermissionRule],
+        workspaceDirectory: URL
+    ) throws -> Int {
+        guard !rules.isEmpty else { return 0 }
+
+        var archive = try runCapturingData("/usr/bin/gzip", arguments: ["-dc", payloadURL.path])
+        var offset = 0
+        var changedCount = 0
+
+        while offset + 76 <= archive.count {
+            guard asciiString(in: archive, offset: offset, length: 6) == "070707" else {
+                throw BuildError.validation("Payload archive is not in the expected cpio format.")
+            }
+
+            let modeOffset = offset + 18
+            let uidOffset = offset + 24
+            let gidOffset = offset + 30
+            let namesize = try octalField(in: archive, offset: offset + 59, length: 6)
+            let filesize = try octalField(in: archive, offset: offset + 65, length: 11)
+            let nameStart = offset + 76
+            let nameEnd = nameStart + namesize
+            guard nameEnd <= archive.count else {
+                throw BuildError.validation("Payload archive contains an invalid cpio path field.")
+            }
+
+            var nameBytes = Array(archive[nameStart..<nameEnd])
+            if nameBytes.last == 0 {
+                nameBytes.removeLast()
+            }
+            let archivePath = String(decoding: nameBytes, as: UTF8.self)
+            if archivePath == "TRAILER!!!" {
+                break
+            }
+
+            let installPath = installPath(fromArchivePath: archivePath)
+            if let rule = matchingPermissionRule(for: installPath, rules: rules) {
+                let currentMode = try octalField(in: archive, offset: modeOffset, length: 6)
+                let fileType = currentMode & 0o170000
+                let permissions = fileType == 0o040000 ? rule.directoryMode : rule.fileMode
+                try writeOctalField(fileType | permissions, in: &archive, offset: modeOffset, length: 6)
+                try writeOctalField(rule.ownerID, in: &archive, offset: uidOffset, length: 6)
+                try writeOctalField(rule.groupID, in: &archive, offset: gidOffset, length: 6)
+                changedCount += 1
+            }
+
+            let rawNextOffset = nameEnd + filesize
+            let paddedNextOffset = rawNextOffset + (rawNextOffset.isMultiple(of: 2) ? 0 : 1)
+            if paddedNextOffset + 6 <= archive.count,
+               asciiString(in: archive, offset: paddedNextOffset, length: 6) == "070707" {
+                offset = paddedNextOffset
+            } else {
+                offset = rawNextOffset
+            }
+        }
+
+        guard changedCount > 0 else { return 0 }
+
+        let rawPayloadURL = workspaceDirectory.appendingPathComponent("Payload-\(UUID().uuidString).cpio")
+        defer { try? FileManager.default.removeItem(at: rawPayloadURL) }
+        try archive.write(to: rawPayloadURL, options: .atomic)
+        let compressedPayload = try runCapturingData("/usr/bin/gzip", arguments: ["-c", rawPayloadURL.path])
+        try compressedPayload.write(to: payloadURL, options: .atomic)
+        return changedCount
+    }
+
+    private func rewriteBomPermissions(
+        in bomURL: URL,
+        rules: [PayloadPermissionRule],
+        workspaceDirectory: URL
+    ) throws -> Int {
+        guard !rules.isEmpty else { return 0 }
+
+        let bomText = String(
+            decoding: try runCapturingData("/usr/bin/lsbom", arguments: [bomURL.path]),
+            as: UTF8.self
+        )
+        var changedCount = 0
+        let rewrittenLines = bomText.split(separator: "\n", omittingEmptySubsequences: false).map { rawLine -> String in
+            let line = String(rawLine)
+            guard !line.isEmpty else { return line }
+
+            var fields = line.components(separatedBy: "\t")
+            guard fields.count >= 3 else { return line }
+
+            let installPath = installPath(fromArchivePath: fields[0])
+            guard let rule = matchingPermissionRule(for: installPath, rules: rules),
+                  let currentMode = Int(fields[1], radix: 8)
+            else {
+                return line
+            }
+
+            let fileType = currentMode & 0o170000
+            let permissions = fileType == 0o040000 ? rule.directoryMode : rule.fileMode
+            fields[1] = String(fileType | permissions, radix: 8)
+            fields[2] = "\(rule.ownerID)/\(rule.groupID)"
+            changedCount += 1
+            return fields.joined(separator: "\t")
+        }
+
+        guard changedCount > 0 else { return 0 }
+
+        let bomInputURL = workspaceDirectory.appendingPathComponent("Bom-\(UUID().uuidString).lsbom")
+        let rewrittenBomURL = workspaceDirectory.appendingPathComponent("Bom-\(UUID().uuidString)")
+        defer {
+            try? FileManager.default.removeItem(at: bomInputURL)
+            try? FileManager.default.removeItem(at: rewrittenBomURL)
+        }
+
+        try rewrittenLines.joined(separator: "\n").write(to: bomInputURL, atomically: true, encoding: .utf8)
+        try runQuietly("/usr/bin/mkbom", arguments: ["-i", bomInputURL.path, rewrittenBomURL.path])
+        try FileManager.default.removeItem(at: bomURL)
+        try FileManager.default.moveItem(at: rewrittenBomURL, to: bomURL)
+        return changedCount
+    }
+
+    private func matchingPermissionRule(for installPath: String, rules: [PayloadPermissionRule]) -> PayloadPermissionRule? {
+        let installPath = installPath.normalizedAbsolutePath
+        return rules.first { rule in
+            installPath == rule.installPath || (rule.recursive && installPath.hasPrefix("\(rule.installPath)/"))
+        }
+    }
+
+    private func installPath(fromArchivePath path: String) -> String {
+        var path = path
+        while path.hasPrefix("./") {
+            path.removeFirst(2)
+        }
+        if path == "." || path.isEmpty {
+            return "/"
+        }
+        return "/\(path)".normalizedAbsolutePath
+    }
+
+    private func asciiString(in data: Data, offset: Int, length: Int) -> String? {
+        guard offset >= 0, offset + length <= data.count else { return nil }
+        return String(data: data[offset..<(offset + length)], encoding: .ascii)
+    }
+
+    private func octalField(in data: Data, offset: Int, length: Int) throws -> Int {
+        guard let value = asciiString(in: data, offset: offset, length: length),
+              let parsed = Int(value, radix: 8)
+        else {
+            throw BuildError.validation("Payload archive contains an invalid octal metadata field.")
+        }
+        return parsed
+    }
+
+    private func writeOctalField(_ value: Int, in data: inout Data, offset: Int, length: Int) throws {
+        let value = String(format: "%0\(length)o", value)
+        guard value.utf8.count == length else {
+            throw BuildError.validation("Payload metadata value does not fit into the cpio field.")
+        }
+        data.replaceSubrange(offset..<(offset + length), with: value.utf8)
     }
 
     private func makeScriptsDirectory(for component: PackageComponent, directory scriptsDirectory: URL) throws -> URL? {
@@ -825,7 +1114,7 @@ struct PackageBuildService {
         let packageRefs = components
             .map {
                 """
-                    <pkg-ref id="\($0.component.packageIdentifier.xmlEscaped)" version="\($0.component.version.xmlEscaped)" onConclusion="none">\($0.packageURL.lastPathComponent.xmlEscaped)</pkg-ref>
+                    <pkg-ref id="\($0.component.packageIdentifier.xmlEscaped)" version="\($0.component.version.xmlEscaped)" auth="Root" onConclusion="none">\($0.packageURL.lastPathComponent.xmlEscaped)</pkg-ref>
                 """
             }
             .joined(separator: "\n")
@@ -1175,6 +1464,36 @@ struct PackageBuildService {
         return outputURL
     }
 
+    private func runCapturingData(_ launchPath: String, arguments: [String]) throws -> Data {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: launchPath)
+        process.arguments = arguments
+
+        let stdout = Pipe()
+        let stderr = Pipe()
+        process.standardOutput = stdout
+        process.standardError = stderr
+
+        try process.run()
+        let output = stdout.fileHandleForReading.readDataToEndOfFile()
+        let errorOutput = stderr.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+
+        guard process.terminationStatus == 0 else {
+            let message = String(decoding: errorOutput, as: UTF8.self).trimmed
+            if message.isEmpty {
+                throw BuildError.commandFailed(launchPath, process.terminationStatus)
+            }
+            throw BuildError.validation(message)
+        }
+
+        return output
+    }
+
+    private func runQuietly(_ launchPath: String, arguments: [String]) throws {
+        _ = try runCapturingData(launchPath, arguments: arguments)
+    }
+
     private func run(
         _ launchPath: String,
         arguments: [String],
@@ -1206,6 +1525,15 @@ struct PackageBuildService {
             throw BuildError.commandFailed(launchPath, process.terminationStatus)
         }
     }
+}
+
+private struct PayloadPermissionRule {
+    let installPath: String
+    let ownerID: Int
+    let groupID: Int
+    let directoryMode: Int
+    let fileMode: Int
+    let recursive: Bool
 }
 
 private final class ProcessOutputCollector: @unchecked Sendable {

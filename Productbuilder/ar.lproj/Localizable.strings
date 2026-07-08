@@ -257,6 +257,12 @@
 "payload.add.help" = "إضافة عنصر حمولة";
 "payload.remove.help" = "إزالة عنصر حمولة";
 "payload.empty" = "لا توجد عناصر حمولة. أضف ملفًا أو محتويات مجلد أو دليلًا فارغًا.";
+"payload.permissions.enabled" = "تعيين مالك وصلاحيات مخصصة";
+"payload.permissions.owner" = "المالك";
+"payload.permissions.group" = "المجموعة";
+"payload.permissions.bundle" = "الحزمة";
+"payload.permissions.directories" = "المجلدات";
+"payload.permissions.files" = "الملفات";
 "localization.title" = "الترجمات";
 "localization.add" = "إضافة ترجمة";
 "localization.add.help" = "إضافة ترجمة";
@@ -318,6 +324,10 @@
 "help.payload.folderContents" = "محتويات المجلد: ينسخ المحتويات الحالية لمجلد المصدر إلى مجلد وجهة ثابت وقت البناء.";
 "help.payload.emptyDirectory" = "دليل فارغ: ينشئ مجلد وجهة بدون الحاجة إلى مسار مصدر.";
 "help.payload.destination" = "الوجهة: مسار التثبيت المطلق الذي سيُحضّر فيه عنصر الحمولة هذا.";
+"help.payload.permissions" = "الصلاحيات: فعّلها عندما يحتاج عنصر الحمولة إلى كتابة المالك والمجموعة وأنماط POSIX صراحةً في Bom/Payload مثل Packages.";
+"help.payload.permissions.principals" = "المالك/المجموعة: استخدم root لعناصر المثبّت؛ و admin لمجلدات دعم التطبيق القابلة للكتابة بواسطة أدوات الإدارة؛ و wheel لمسارات النظام العادية؛ و staff لموارد المستخدم المشتركة.";
+"help.payload.permissions.modes" = "الأنماط: 755 يسمح بالقراءة/العبور والتنفيذ؛ 775 يسمح أيضًا بالكتابة للمجموعة؛ 644 للملفات العادية للقراءة فقط.";
+"help.payload.permissions.bundle" = "الحزم: لعناصر .app/.systemextension يُطبّق نمط الحزمة على جذر الحزمة فقط؛ وتحتفظ الملفات الداخلية بصلاحيات المصدر وتوقيعات الكود.";
 "mustClose.enabled" = "مفعّل";
 "mustClose.empty" = "لا توجد تطبيقات في القائمة بعد. أضف معرّف الحزمة أو اختر تطبيق .app.";
 "mustClose.add" = "إضافة معرّف حزمة";

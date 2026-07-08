@@ -257,6 +257,12 @@
 "payload.add.help" = "পেলোড এন্ট্রি যোগ করুন";
 "payload.remove.help" = "পেলোড এন্ট্রি সরান";
 "payload.empty" = "কোনো পেলোড এন্ট্রি নেই। ফাইল, ফোল্ডারের বিষয়বস্তু বা খালি ডিরেক্টরি যোগ করুন।";
+"payload.permissions.enabled" = "Custom owner ও permissions সেট করুন";
+"payload.permissions.owner" = "Owner";
+"payload.permissions.group" = "Group";
+"payload.permissions.bundle" = "Bundle";
+"payload.permissions.directories" = "Folders";
+"payload.permissions.files" = "Files";
 "localization.title" = "লোকালাইজেশন";
 "localization.add" = "লোকালাইজেশন যোগ করুন";
 "localization.add.help" = "লোকালাইজেশন যোগ করুন";
@@ -318,6 +324,10 @@
 "help.payload.folderContents" = "Folder Contents: build time-এ source folder-এর current contents fixed destination folder-এ copy করে।";
 "help.payload.emptyDirectory" = "Empty Directory: source path ছাড়াই destination folder তৈরি করে।";
 "help.payload.destination" = "Destination: absolute install path যেখানে এই payload entry staged হবে।";
+"help.payload.permissions" = "Permissions: payload entry-র owner, group এবং POSIX modes Packages-এর মতো Bom/Payload-এ স্পষ্টভাবে লিখতে হলে এটি চালু করুন।";
+"help.payload.permissions.principals" = "Owner/Group: installer-owned items-এর জন্য root; admin tools যে app support folders লিখবে তার জন্য admin; সাধারণ system paths-এর জন্য wheel; shared user resources-এর জন্য staff।";
+"help.payload.permissions.modes" = "Modes: 755 read/traverse এবং execute দেয়; 775 group-কে write-ও দেয়; 644 সাধারণ read-only files-এর জন্য।";
+"help.payload.permissions.bundle" = "Bundles: .app/.systemextension entries-এ Bundle mode শুধু bundle root-এ প্রযোজ্য; ভিতরের files source permissions ও code signatures রাখে।";
 "mustClose.enabled" = "চালু";
 "mustClose.empty" = "এখনো কোনো অ্যাপ তালিকায় নেই। বান্ডল আইডেন্টিফায়ার যোগ করুন অথবা .app নির্বাচন করুন।";
 "mustClose.add" = "Bundle ID যোগ করুন";

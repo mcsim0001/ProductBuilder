@@ -257,6 +257,12 @@
 "payload.add.help" = "添加载荷条目";
 "payload.remove.help" = "移除载荷条目";
 "payload.empty" = "没有载荷项。请添加文件、文件夹内容或空目录。";
+"payload.permissions.enabled" = "设置自定义所有者和权限";
+"payload.permissions.owner" = "所有者";
+"payload.permissions.group" = "组";
+"payload.permissions.bundle" = "Bundle";
+"payload.permissions.directories" = "文件夹";
+"payload.permissions.files" = "文件";
 "localization.title" = "本地化";
 "localization.add" = "添加本地化";
 "localization.add.help" = "添加本地化";
@@ -318,6 +324,10 @@
 "help.payload.folderContents" = "文件夹内容：在构建时将源文件夹的当前内容复制到固定目标文件夹。";
 "help.payload.emptyDirectory" = "空目录：创建目标文件夹，不需要源路径。";
 "help.payload.destination" = "目标位置：此载荷项将被暂存到的绝对安装路径。";
+"help.payload.permissions" = "权限：当载荷项需要像 Packages 一样把明确的所有者、组和 POSIX 模式写入 Bom/Payload 时启用。";
+"help.payload.permissions.principals" = "所有者/组：安装器拥有的项目使用 root；需由管理工具写入的应用支持文件夹使用 admin；普通系统路径使用 wheel；共享用户资源使用 staff。";
+"help.payload.permissions.modes" = "模式：755 允许读取/进入和执行；775 还允许组写入；644 适用于普通只读文件。";
+"help.payload.permissions.bundle" = "Bundle：对于 .app/.systemextension，Bundle 模式只应用到 bundle 根目录；内部文件保留源权限和代码签名。";
 "mustClose.enabled" = "已启用";
 "mustClose.empty" = "尚未列出任何 App。请添加包标识符或选择一个 .app。";
 "mustClose.add" = "添加包 ID";

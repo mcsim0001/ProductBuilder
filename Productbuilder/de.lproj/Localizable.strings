@@ -257,6 +257,12 @@
 "payload.add.help" = "Nutzlast-Eintrag hinzufügen";
 "payload.remove.help" = "Nutzlast-Eintrag entfernen";
 "payload.empty" = "Keine Nutzlast-Einträge. Fügen Sie eine Datei, Ordnerinhalt oder einen leeren Ordner hinzu.";
+"payload.permissions.enabled" = "Benutzerdefinierte Eigentümer und Rechte setzen";
+"payload.permissions.owner" = "Eigentümer";
+"payload.permissions.group" = "Gruppe";
+"payload.permissions.bundle" = "Bundle";
+"payload.permissions.directories" = "Ordner";
+"payload.permissions.files" = "Dateien";
 "localization.title" = "Lokalisierungen";
 "localization.add" = "Lokalisierung hinzufügen";
 "localization.add.help" = "Lokalisierung hinzufügen";
@@ -318,6 +324,10 @@
 "help.payload.folderContents" = "Ordnerinhalt: kopiert den aktuellen Inhalt eines Quellordners zur Build-Zeit in einen festen Zielordner.";
 "help.payload.emptyDirectory" = "Leeres Verzeichnis: erstellt einen Zielordner ohne Quellpfad.";
 "help.payload.destination" = "Ziel: absolute install path where this payload entry will be staged.";
+"help.payload.permissions" = "Rechte: aktivieren, wenn ein Payload-Eintrag explizite Eigentümer, Gruppe und POSIX-Modi in Bom/Payload wie bei Packages benötigt.";
+"help.payload.permissions.principals" = "Eigentümer/Gruppe: root für vom Installer verwaltete Elemente; admin für App-Support-Ordner, die Admin-Tools beschreiben; wheel für normale Systempfade; staff für gemeinsam genutzte Benutzerressourcen.";
+"help.payload.permissions.modes" = "Modi: 755 erlaubt Lesen/Durchqueren und Ausführen; 775 erlaubt zusätzlich Schreibzugriff für die Gruppe; 644 ist für normale schreibgeschützte Dateien.";
+"help.payload.permissions.bundle" = "Bundles: Für .app/.systemextension wird der Bundle-Modus nur auf die Bundle-Wurzel angewendet; interne Dateien behalten Quellrechte und Codesignaturen.";
 "mustClose.enabled" = "Aktiviert";
 "mustClose.empty" = "Noch keine Apps aufgelistet. Fügen Sie eine Bundle-ID hinzu oder wählen Sie eine .app.";
 "mustClose.add" = "Bundle-ID hinzufügen";

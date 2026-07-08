@@ -257,6 +257,12 @@
 "payload.add.help" = "Tambah entri payload";
 "payload.remove.help" = "Hapus entri payload";
 "payload.empty" = "Tidak ada entri payload. Tambahkan file, isi folder, atau direktori kosong.";
+"payload.permissions.enabled" = "Atur pemilik dan izin khusus";
+"payload.permissions.owner" = "Pemilik";
+"payload.permissions.group" = "Grup";
+"payload.permissions.bundle" = "Bundle";
+"payload.permissions.directories" = "Folder";
+"payload.permissions.files" = "Berkas";
 "localization.title" = "Lokalisasi";
 "localization.add" = "Tambah lokalisasi";
 "localization.add.help" = "Tambah lokalisasi";
@@ -318,6 +324,10 @@
 "help.payload.folderContents" = "Isi folder: menyalin isi folder sumber saat ini ke folder tujuan tetap saat build.";
 "help.payload.emptyDirectory" = "Direktori kosong: membuat folder tujuan tanpa memerlukan jalur sumber.";
 "help.payload.destination" = "Tujuan: absolute install path where this payload entry will be staged.";
+"help.payload.permissions" = "Izin: aktifkan saat entri payload perlu menulis pemilik, grup, dan mode POSIX eksplisit ke Bom/Payload seperti Packages.";
+"help.payload.permissions.principals" = "Pemilik/Grup: gunakan root untuk item milik installer; admin untuk folder dukungan app yang dapat ditulis alat admin; wheel untuk jalur sistem biasa; staff untuk sumber daya pengguna bersama.";
+"help.payload.permissions.modes" = "Mode: 755 mengizinkan baca/masuk dan eksekusi; 775 juga mengizinkan grup menulis; 644 untuk berkas biasa hanya-baca.";
+"help.payload.permissions.bundle" = "Bundle: untuk entri .app/.systemextension, mode Bundle hanya diterapkan ke akar bundle; file internal mempertahankan izin sumber dan tanda tangan kode.";
 "mustClose.enabled" = "Aktif";
 "mustClose.empty" = "Belum ada aplikasi. Tambahkan bundle identifier atau pilih .app.";
 "mustClose.add" = "Tambah Bundle ID";

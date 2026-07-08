@@ -257,6 +257,12 @@
 "payload.add.help" = "Додати запис вмісту пакета";
 "payload.remove.help" = "Видалити запис вмісту пакета";
 "payload.empty" = "Вміст пакета ще не задано. Додайте файл, вміст папки або порожню папку.";
+"payload.permissions.enabled" = "Задати власника та права";
+"payload.permissions.owner" = "Власник";
+"payload.permissions.group" = "Група";
+"payload.permissions.bundle" = "Бандл";
+"payload.permissions.directories" = "Папки";
+"payload.permissions.files" = "Файли";
 "localization.title" = "Мовні версії";
 "localization.add" = "Додати мову";
 "localization.add.help" = "Додати мовну версію";
@@ -318,6 +324,10 @@
 "help.payload.folderContents" = "Вміст папки: копіює поточний вміст вихідної папки у фіксовану папку призначення під час збірки.";
 "help.payload.emptyDirectory" = "Порожня папка: створює папку призначення без вихідного шляху.";
 "help.payload.destination" = "Шлях призначення: абсолютний шлях, куди буде підготовлено цей запис вмісту пакета.";
+"help.payload.permissions" = "Права: увімкніть, коли для запису вмісту треба явно записати власника, групу і POSIX-права в Bom/Payload, як це робить Packages.";
+"help.payload.permissions.principals" = "Власник/група: root для елементів, якими володіє інсталятор; admin для папок підтримки додатка, доступних admin-інструментам; wheel для звичайних системних шляхів; staff для спільних користувацьких ресурсів.";
+"help.payload.permissions.modes" = "Режими: 755 дає всім читання/прохід і виконання; 775 додатково дозволяє групі запис; 644 підходить для звичайних файлів тільки для читання.";
+"help.payload.permissions.bundle" = "Бандли: для .app/.systemextension поле «Бандл» застосовується тільки до кореня бандла; внутрішні файли зберігають права з джерела і code signature.";
 "mustClose.enabled" = "Увімкнено";
 "mustClose.empty" = "Список додатків порожній. Додайте bundle identifier або виберіть .app.";
 "mustClose.add" = "Додати bundle id";

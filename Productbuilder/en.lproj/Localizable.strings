@@ -257,6 +257,12 @@
 "payload.add.help" = "Add payload entry";
 "payload.remove.help" = "Remove payload entry";
 "payload.empty" = "No payload entries. Add a file, folder contents, or an empty directory.";
+"payload.permissions.enabled" = "Set custom ownership and permissions";
+"payload.permissions.owner" = "Owner";
+"payload.permissions.group" = "Group";
+"payload.permissions.bundle" = "Bundle";
+"payload.permissions.directories" = "Dirs";
+"payload.permissions.files" = "Files";
 "localization.title" = "Localizations";
 "localization.add" = "Add Localization";
 "localization.add.help" = "Add localization";
@@ -318,6 +324,10 @@
 "help.payload.folderContents" = "Folder Contents: copies the current contents of a source folder into a fixed destination folder at build time.";
 "help.payload.emptyDirectory" = "Empty Directory: creates a destination folder without requiring a source path.";
 "help.payload.destination" = "Destination: absolute install path where this payload entry will be staged.";
+"help.payload.permissions" = "Permissions: enable this when a payload needs explicit owner, group, and POSIX modes written into Bom/Payload like Packages.";
+"help.payload.permissions.principals" = "Owner/Group: use root for installer-owned items; admin for app support folders writable by admin tools; wheel for ordinary system-owned paths; staff for shared user resources.";
+"help.payload.permissions.modes" = "Modes: 755 lets everyone read/traverse and execute; 775 also lets the group write; 644 is for regular read-only files.";
+"help.payload.permissions.bundle" = "Bundles: for .app/.systemextension entries, Bundle mode applies only to the bundle root; internal files keep source permissions and code signatures.";
 "mustClose.enabled" = "Enabled";
 "mustClose.empty" = "No apps are listed yet. Add a bundle identifier or choose an .app.";
 "mustClose.add" = "Add Bundle ID";

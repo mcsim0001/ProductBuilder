@@ -257,6 +257,12 @@
 "payload.add.help" = "ペイロード項目を追加";
 "payload.remove.help" = "ペイロード項目を削除";
 "payload.empty" = "ペイロード項目がありません。ファイル、フォルダの内容、または空のディレクトリを追加してください。";
+"payload.permissions.enabled" = "所有者と権限を個別に設定";
+"payload.permissions.owner" = "所有者";
+"payload.permissions.group" = "グループ";
+"payload.permissions.bundle" = "バンドル";
+"payload.permissions.directories" = "フォルダ";
+"payload.permissions.files" = "ファイル";
 "localization.title" = "ローカライズ";
 "localization.add" = "ローカライズを追加";
 "localization.add.help" = "ローカライズを追加";
@@ -318,6 +324,10 @@
 "help.payload.folderContents" = "フォルダの内容: ビルド時点のソースフォルダの内容を固定のインストール先フォルダへコピーします。";
 "help.payload.emptyDirectory" = "空のディレクトリ: ソースパスを必要とせず、インストール先フォルダを作成します。";
 "help.payload.destination" = "インストール先: このペイロード項目を配置する絶対インストールパスです。";
+"help.payload.permissions" = "権限: Packages と同様に、所有者、グループ、POSIX モードを Bom/Payload に明示的に書き込む必要がある場合に有効にします。";
+"help.payload.permissions.principals" = "所有者/グループ: インストーラ管理の項目は root、管理ツールが書き込むアプリサポートフォルダは admin、通常のシステムパスは wheel、共有ユーザーリソースは staff を使います。";
+"help.payload.permissions.modes" = "モード: 755 は読み取り/通過と実行を許可します。775 はグループの書き込みも許可します。644 は通常の読み取り専用ファイル向けです。";
+"help.payload.permissions.bundle" = "バンドル: .app/.systemextension では、バンドルモードはバンドルのルートだけに適用されます。内部ファイルは元の権限とコード署名を保持します。";
 "mustClose.enabled" = "有効";
 "mustClose.empty" = "アプリはまだ登録されていません。バンドル識別子を追加するか .app を選択してください。";
 "mustClose.add" = "Bundle ID を追加";

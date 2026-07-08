@@ -200,10 +200,29 @@ struct MustCloseApplicationItem: Codable, Identifiable, Equatable {
 }
 
 struct PackagePayloadEntry: Codable, Identifiable, Equatable {
+    private static let bundleExtensions: Set<String> = [
+        "app",
+        "appex",
+        "bundle",
+        "framework",
+        "plugin",
+        "prefpane",
+        "saver",
+        "systemextension",
+        "xpc"
+    ]
+
     var id: UUID = UUID()
     var kind: PackagePayloadKind = .fileOrFolder
     var sourcePath: String = ""
     var destinationPath: String = "/Applications"
+    var permissions: PackagePayloadPermissions = .disabled
+
+    var isBundlePayload: Bool {
+        guard kind == .fileOrFolder else { return false }
+        let pathExtension = URL(fileURLWithPath: sourcePath).pathExtension.lowercased()
+        return Self.bundleExtensions.contains(pathExtension)
+    }
 
     var title: String {
         switch kind {
@@ -214,6 +233,94 @@ struct PackagePayloadEntry: Codable, Identifiable, Equatable {
         case .emptyDirectory:
             return destinationPath.isEmpty ? "Empty Directory" : destinationPath
         }
+    }
+
+    init(
+        id: UUID = UUID(),
+        kind: PackagePayloadKind = .fileOrFolder,
+        sourcePath: String = "",
+        destinationPath: String = "/Applications",
+        permissions: PackagePayloadPermissions = .disabled
+    ) {
+        self.id = id
+        self.kind = kind
+        self.sourcePath = sourcePath
+        self.destinationPath = destinationPath
+        self.permissions = permissions
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case kind
+        case sourcePath
+        case destinationPath
+        case permissions
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? id
+        kind = try container.decodeIfPresent(PackagePayloadKind.self, forKey: .kind) ?? kind
+        sourcePath = try container.decodeIfPresent(String.self, forKey: .sourcePath) ?? sourcePath
+        destinationPath = try container.decodeIfPresent(String.self, forKey: .destinationPath) ?? destinationPath
+        permissions = try container.decodeIfPresent(PackagePayloadPermissions.self, forKey: .permissions) ?? permissions
+    }
+}
+
+struct PackagePayloadPermissions: Codable, Equatable {
+    var isEnabled: Bool = false
+    var owner: String = "root"
+    var group: String = "admin"
+    var directoryMode: String = "775"
+    var fileMode: String = "644"
+    var bundleMode: String = "755"
+
+    static let disabled = PackagePayloadPermissions()
+
+    static func packagesStyle(directoryMode: String = "775", fileMode: String = "644") -> PackagePayloadPermissions {
+        PackagePayloadPermissions(
+            isEnabled: true,
+            owner: "root",
+            group: "admin",
+            directoryMode: directoryMode,
+            fileMode: fileMode,
+            bundleMode: "755"
+        )
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case isEnabled
+        case owner
+        case group
+        case directoryMode
+        case fileMode
+        case bundleMode
+    }
+
+    init(
+        isEnabled: Bool = false,
+        owner: String = "root",
+        group: String = "admin",
+        directoryMode: String = "775",
+        fileMode: String = "644",
+        bundleMode: String = "755"
+    ) {
+        self.isEnabled = isEnabled
+        self.owner = owner
+        self.group = group
+        self.directoryMode = directoryMode
+        self.fileMode = fileMode
+        self.bundleMode = bundleMode
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? isEnabled
+        owner = try container.decodeIfPresent(String.self, forKey: .owner) ?? owner
+        group = try container.decodeIfPresent(String.self, forKey: .group) ?? group
+        directoryMode = try container.decodeIfPresent(String.self, forKey: .directoryMode) ?? directoryMode
+        fileMode = try container.decodeIfPresent(String.self, forKey: .fileMode) ?? fileMode
+        bundleMode = try container.decodeIfPresent(String.self, forKey: .bundleMode) ?? bundleMode
     }
 }
 

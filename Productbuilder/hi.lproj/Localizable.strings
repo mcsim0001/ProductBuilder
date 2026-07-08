@@ -257,6 +257,12 @@
 "payload.add.help" = "पेलोड प्रविष्टि जोड़ें";
 "payload.remove.help" = "पेलोड प्रविष्टि हटाएँ";
 "payload.empty" = "कोई पेलोड प्रविष्टि नहीं। फ़ाइल, फ़ोल्डर सामग्री या खाली डायरेक्टरी जोड़ें।";
+"payload.permissions.enabled" = "Custom owner और permissions सेट करें";
+"payload.permissions.owner" = "Owner";
+"payload.permissions.group" = "Group";
+"payload.permissions.bundle" = "Bundle";
+"payload.permissions.directories" = "Folders";
+"payload.permissions.files" = "Files";
 "localization.title" = "स्थानीयकरण";
 "localization.add" = "स्थानीयकरण जोड़ें";
 "localization.add.help" = "स्थानीयकरण जोड़ें";
@@ -318,6 +324,10 @@
 "help.payload.folderContents" = "Folder Contents: build time पर source folder की current contents को fixed destination folder में copy करता है।";
 "help.payload.emptyDirectory" = "Empty Directory: source path के बिना destination folder बनाता है।";
 "help.payload.destination" = "Destination: absolute install path जहाँ यह payload entry staged होगी।";
+"help.payload.permissions" = "Permissions: जब payload entry को Packages की तरह Bom/Payload में owner, group और POSIX modes साफ़-साफ़ लिखने हों, तब इसे चालू करें।";
+"help.payload.permissions.principals" = "Owner/Group: installer-owned items के लिए root; admin tools द्वारा writable app support folders के लिए admin; सामान्य system paths के लिए wheel; shared user resources के लिए staff।";
+"help.payload.permissions.modes" = "Modes: 755 read/traverse और execute देता है; 775 group को write भी देता है; 644 सामान्य read-only files के लिए है।";
+"help.payload.permissions.bundle" = "Bundles: .app/.systemextension entries में Bundle mode केवल bundle root पर लागू होता है; अंदर की files source permissions और code signatures रखती हैं।";
 "mustClose.enabled" = "सक्षम";
 "mustClose.empty" = "अभी कोई ऐप सूची में नहीं है। बंडल पहचानकर्ता जोड़ें या .app चुनें।";
 "mustClose.add" = "Bundle ID जोड़ें";

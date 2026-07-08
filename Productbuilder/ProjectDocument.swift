@@ -531,13 +531,16 @@ enum PackagesProjectImporter {
         let path = node.string("PATH") ?? ""
         let itemType = node.int("TYPE", default: 1)
         let children = node["CHILDREN"] as? [[String: Any]] ?? []
+        let nodePermissions = payloadPermissions(from: node)
 
         if itemType == 3, let source = resolvePath(node, baseURL: baseURL) {
             let destination = normalizedDestination(destinationParts)
+            let importedPermissions = source.hasSuffix(".app") ? .disabled : nodePermissions
             items.append(PackagePayloadEntry(
                 kind: .fileOrFolder,
                 sourcePath: source,
-                destinationPath: destination
+                destinationPath: destination,
+                permissions: importedPermissions
             ))
             return
         }
@@ -552,7 +555,19 @@ enum PackagesProjectImporter {
             items.append(PackagePayloadEntry(
                 kind: .emptyDirectory,
                 sourcePath: "",
-                destinationPath: directoryDestination
+                destinationPath: directoryDestination,
+                permissions: nodePermissions
+            ))
+        } else if !children.isEmpty,
+                  !children.contains(where: { $0.int("TYPE", default: 1) == 3 }),
+                  directoryDestination != "/",
+                  !isStandardSystemDirectoryTemplate(directoryDestination),
+                  nodePermissions.isEnabled {
+            items.append(PackagePayloadEntry(
+                kind: .emptyDirectory,
+                sourcePath: "",
+                destinationPath: directoryDestination,
+                permissions: nodePermissions
             ))
         }
 
@@ -576,10 +591,19 @@ enum PackagesProjectImporter {
                 continue
             }
             let parent = URL(fileURLWithPath: first.sourcePath).deletingLastPathComponent().path
+            var permissions = first.permissions
+            if permissions.isEnabled {
+                permissions.directoryMode = "775"
+                let fileModes = Set(group.map(\.permissions.fileMode).filter { !$0.isEmpty })
+                if fileModes.count == 1, let fileMode = fileModes.first {
+                    permissions.fileMode = fileMode
+                }
+            }
             result.append(PackagePayloadEntry(
                 kind: .folderContents,
                 sourcePath: parent,
-                destinationPath: first.destinationPath
+                destinationPath: first.destinationPath,
+                permissions: permissions
             ))
         }
 
@@ -591,6 +615,48 @@ enum PackagesProjectImporter {
             }
             seen.insert(key)
             return true
+        }
+    }
+
+    private static func payloadPermissions(from node: [String: Any]) -> PackagePayloadPermissions {
+        guard let rawMode = node.int("PERMISSIONS") else {
+            return .disabled
+        }
+
+        let uid = node.int("UID", default: 0)
+        let gid = node.int("GID", default: 0)
+        let mode = String(rawMode & 0o777, radix: 8)
+        let itemType = node.int("TYPE", default: 1)
+        let fileMode = itemType == 2 ? "644" : mode
+
+        return PackagePayloadPermissions(
+            isEnabled: true,
+            owner: userName(for: uid),
+            group: groupName(for: gid),
+            directoryMode: mode,
+            fileMode: fileMode
+        )
+    }
+
+    private static func userName(for uid: Int) -> String {
+        switch uid {
+        case 0:
+            return "root"
+        default:
+            return String(uid)
+        }
+    }
+
+    private static func groupName(for gid: Int) -> String {
+        switch gid {
+        case 0:
+            return "wheel"
+        case 20:
+            return "staff"
+        case 80:
+            return "admin"
+        default:
+            return String(gid)
         }
     }
 

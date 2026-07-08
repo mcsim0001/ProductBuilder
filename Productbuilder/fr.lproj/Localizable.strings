@@ -257,6 +257,12 @@
 "payload.add.help" = "Ajouter une entrée de charge utile";
 "payload.remove.help" = "Supprimer l’entrée de charge utile";
 "payload.empty" = "Aucune entrée de charge utile. Ajoutez un fichier, le contenu d’un dossier ou un dossier vide.";
+"payload.permissions.enabled" = "Définir propriétaire et permissions personnalisés";
+"payload.permissions.owner" = "Propriétaire";
+"payload.permissions.group" = "Groupe";
+"payload.permissions.bundle" = "Bundle";
+"payload.permissions.directories" = "Dossiers";
+"payload.permissions.files" = "Fichiers";
 "localization.title" = "Localisations";
 "localization.add" = "Ajouter une localisation";
 "localization.add.help" = "Ajouter une localisation";
@@ -318,6 +324,10 @@
 "help.payload.folderContents" = "Contenu du dossier : copie le contenu actuel d’un dossier source vers un dossier de destination fixe pendant la compilation.";
 "help.payload.emptyDirectory" = "Dossier vide : crée un dossier de destination sans chemin source.";
 "help.payload.destination" = "Destination : absolute install path where this payload entry will be staged.";
+"help.payload.permissions" = "Permissions : activez-les lorsqu’une entrée de contenu doit écrire explicitement propriétaire, groupe et modes POSIX dans Bom/Payload comme Packages.";
+"help.payload.permissions.principals" = "Propriétaire/Groupe : utilisez root pour les éléments détenus par l’installateur ; admin pour les dossiers de support modifiables par des outils admin ; wheel pour les chemins système courants ; staff pour les ressources utilisateur partagées.";
+"help.payload.permissions.modes" = "Modes : 755 autorise lecture/traversée et exécution ; 775 autorise aussi l’écriture au groupe ; 644 convient aux fichiers ordinaires en lecture seule.";
+"help.payload.permissions.bundle" = "Bundles : pour .app/.systemextension, le mode Bundle s’applique seulement à la racine du bundle ; les fichiers internes conservent leurs permissions source et signatures de code.";
 "mustClose.enabled" = "Activé";
 "mustClose.empty" = "Aucune app listée. Ajoutez un identifiant de bundle ou choisissez une .app.";
 "mustClose.add" = "Ajouter un Bundle ID";

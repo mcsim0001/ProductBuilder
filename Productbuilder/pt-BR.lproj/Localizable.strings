@@ -257,6 +257,12 @@
 "payload.add.help" = "Adicionar entrada de payload";
 "payload.remove.help" = "Remover entrada de payload";
 "payload.empty" = "Nenhuma entrada de payload. Adicione arquivo, conteúdo de pasta ou diretório vazio.";
+"payload.permissions.enabled" = "Definir proprietário e permissões personalizados";
+"payload.permissions.owner" = "Proprietário";
+"payload.permissions.group" = "Grupo";
+"payload.permissions.bundle" = "Bundle";
+"payload.permissions.directories" = "Pastas";
+"payload.permissions.files" = "Arquivos";
 "localization.title" = "Localizações";
 "localization.add" = "Adicionar localização";
 "localization.add.help" = "Adicionar localização";
@@ -318,6 +324,10 @@
 "help.payload.folderContents" = "Conteúdo da pasta: copia o conteúdo atual de uma pasta de origem para uma pasta de destino fixa durante o build.";
 "help.payload.emptyDirectory" = "Diretório vazio: cria uma pasta de destino sem exigir um caminho de origem.";
 "help.payload.destination" = "Destino: absolute install path where this payload entry will be staged.";
+"help.payload.permissions" = "Permissões: ative quando uma entrada de conteúdo precisar gravar proprietário, grupo e modos POSIX explicitamente no Bom/Payload como no Packages.";
+"help.payload.permissions.principals" = "Proprietário/Grupo: use root para itens do instalador; admin para pastas de suporte do app graváveis por ferramentas administrativas; wheel para caminhos comuns do sistema; staff para recursos compartilhados de usuário.";
+"help.payload.permissions.modes" = "Modos: 755 permite ler/atravessar e executar; 775 também permite escrita pelo grupo; 644 é para arquivos comuns somente leitura.";
+"help.payload.permissions.bundle" = "Bundles: para entradas .app/.systemextension, o modo Bundle se aplica apenas à raiz do bundle; arquivos internos preservam permissões de origem e assinaturas de código.";
 "mustClose.enabled" = "Ativado";
 "mustClose.empty" = "Nenhum app listado ainda. Adicione um identificador de bundle ou escolha um .app.";
 "mustClose.add" = "Adicionar Bundle ID";

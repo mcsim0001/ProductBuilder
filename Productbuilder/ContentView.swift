@@ -731,19 +731,6 @@ struct ContentView: View {
                 }
 
                 GridRow {
-                    Text(localization.t("field.ownership"))
-                    Picker(localization.t("picker.ownership"), selection: binding(\.ownership)) {
-                        ForEach(OwnershipMode.allCases) { mode in
-                            Text(mode.localizedTitle(localization)).tag(mode)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 260)
-                    .help(localization.t("help.ownership.short"))
-                }
-
-                GridRow {
                     Text(localization.t("field.choice"))
                     VStack(alignment: .leading, spacing: 8) {
                         Toggle(localization.t("toggle.required"), isOn: requiredChoiceBinding)
@@ -789,7 +776,6 @@ struct ContentView: View {
                     localization.t("help.component.name"),
                     localization.t("help.component.identifier"),
                     localization.t("help.component.version"),
-                    localization.t("help.component.ownership"),
                     localization.t("help.component.choice"),
                     localization.t("help.component.scripts"),
                     localization.t("help.component.mustCloseApplications")
@@ -2117,7 +2103,11 @@ private struct PayloadEntriesEditor: View {
                         localization.t("help.payload.fileFolder"),
                         localization.t("help.payload.folderContents"),
                         localization.t("help.payload.emptyDirectory"),
-                        localization.t("help.payload.destination")
+                        localization.t("help.payload.destination"),
+                        localization.t("help.payload.permissions"),
+                        localization.t("help.payload.permissions.principals"),
+                        localization.t("help.payload.permissions.modes"),
+                        localization.t("help.payload.permissions.bundle")
                     ]
                 )
                 Spacer()
@@ -2371,7 +2361,10 @@ private struct PayloadEntryRow: View {
                 .labelsHidden()
                 .frame(width: 150)
 
-                TextField(localization.t("field.destination"), text: $entry.destinationPath)
+                EndScrollingTextField(
+                    placeholder: localization.t("field.destination"),
+                    text: $entry.destinationPath
+                )
 
                 Button(role: .destructive) {
                     remove()
@@ -2389,10 +2382,196 @@ private struct PayloadEntryRow: View {
                     optional: false
                 )
             }
+
+            Toggle(localization.t("payload.permissions.enabled"), isOn: $entry.permissions.isEnabled)
+
+            if entry.permissions.isEnabled {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    PermissionPrincipalPicker(
+                        title: localization.t("payload.permissions.owner"),
+                        selection: $entry.permissions.owner,
+                        options: ["root"]
+                    )
+
+                    PermissionPrincipalPicker(
+                        title: localization.t("payload.permissions.group"),
+                        selection: $entry.permissions.group,
+                        options: ["admin", "wheel", "staff"]
+                    )
+
+                    if entry.isBundlePayload {
+                        permissionLabel(localization.t("payload.permissions.bundle"))
+                        TextField("755", text: $entry.permissions.bundleMode)
+                            .frame(width: 54)
+                    } else {
+                        permissionLabel(localization.t("payload.permissions.directories"))
+                        TextField("775", text: $entry.permissions.directoryMode)
+                            .frame(width: 54)
+
+                        if entry.kind != .emptyDirectory {
+                            permissionLabel(localization.t("payload.permissions.files"))
+                            TextField("644", text: $entry.permissions.fileMode)
+                                .frame(width: 54)
+                        }
+                    }
+                }
+                .font(.callout)
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .clipped()
+            }
         }
         .padding(8)
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    private func permissionLabel(_ title: String) -> some View {
+        Text(title)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+    }
+}
+
+private struct PermissionPrincipalPicker: View {
+    let title: String
+    @Binding var selection: String
+    let options: [String]
+
+    private var effectiveOptions: [String] {
+        let normalizedSelection = selection.trimmed
+        guard !normalizedSelection.isEmpty, !options.contains(normalizedSelection) else {
+            return options
+        }
+        return [normalizedSelection] + options
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+            Picker(title, selection: $selection) {
+                ForEach(effectiveOptions, id: \.self) { option in
+                    Text(option).tag(option)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 104, alignment: .leading)
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+}
+
+private struct EndScrollingTextField: NSViewRepresentable {
+    var placeholder: String
+    @Binding var text: String
+
+    func makeNSView(context: Context) -> NSTextField {
+        let textField = EndScrollingNSTextField(string: text)
+        textField.placeholderString = placeholder
+        textField.delegate = context.coordinator
+        textField.isEditable = true
+        textField.isSelectable = true
+        textField.isBordered = true
+        textField.isBezeled = true
+        textField.bezelStyle = .roundedBezel
+        textField.drawsBackground = true
+        textField.configureDisplayMode()
+        return textField
+    }
+
+    func updateNSView(_ textField: NSTextField, context: Context) {
+        context.coordinator.text = $text
+        textField.placeholderString = placeholder
+        if textField.stringValue != text {
+            textField.stringValue = text
+        }
+        if let textField = textField as? EndScrollingNSTextField {
+            if textField.currentEditor() == nil {
+                textField.configureDisplayMode()
+            } else {
+                textField.configureEditingMode()
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text)
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var text: Binding<String>
+
+        init(text: Binding<String>) {
+            self.text = text
+        }
+
+        func controlTextDidBeginEditing(_ notification: Notification) {
+            guard let textField = notification.object as? EndScrollingNSTextField else { return }
+            textField.configureEditingMode()
+            textField.scheduleScrollToEnd()
+        }
+
+        func controlTextDidChange(_ notification: Notification) {
+            guard let textField = notification.object as? NSTextField else { return }
+            text.wrappedValue = textField.stringValue
+        }
+
+        func controlTextDidEndEditing(_ notification: Notification) {
+            guard let textField = notification.object as? NSTextField else { return }
+            text.wrappedValue = textField.stringValue
+            (textField as? EndScrollingNSTextField)?.configureDisplayMode()
+            textField.needsDisplay = true
+        }
+    }
+}
+
+private final class EndScrollingNSTextField: NSTextField {
+    override func becomeFirstResponder() -> Bool {
+        let becameFirstResponder = super.becomeFirstResponder()
+        if becameFirstResponder {
+            configureEditingMode()
+            scheduleScrollToEnd()
+        }
+        return becameFirstResponder
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let wasEditing = currentEditor() != nil
+        super.mouseDown(with: event)
+        if !wasEditing {
+            scheduleScrollToEnd()
+        }
+    }
+
+    func configureDisplayMode() {
+        cell?.usesSingleLineMode = true
+        cell?.lineBreakMode = .byTruncatingHead
+        cell?.isScrollable = false
+    }
+
+    func configureEditingMode() {
+        cell?.usesSingleLineMode = true
+        cell?.lineBreakMode = .byClipping
+        cell?.isScrollable = true
+    }
+
+    func scheduleScrollToEnd() {
+        configureEditingMode()
+        DispatchQueue.main.async { [weak self] in
+            self?.scrollEditorToEnd()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            self?.scrollEditorToEnd()
+        }
+    }
+
+    private func scrollEditorToEnd() {
+        guard let editor = currentEditor() else { return }
+        let end = NSRange(location: (editor.string as NSString).length, length: 0)
+        editor.selectedRange = end
+        editor.scrollRangeToVisible(end)
     }
 }
 
@@ -2538,7 +2717,10 @@ private struct PathField: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            TextField(optional ? localization.t("path.optional") : localization.t("path.choosePath"), text: $path)
+            EndScrollingTextField(
+                placeholder: optional ? localization.t("path.optional") : localization.t("path.choosePath"),
+                text: $path
+            )
 
             Button {
                 choosePath()
